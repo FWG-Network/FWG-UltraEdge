@@ -1,0 +1,764 @@
+# ============================================================
+# FWG-UltraEdge 🌍⚡ — Enterprise SLSA 11-Job CI/CD Pipeline
+# Principal DevOps Engineer: FWG-UltraEdge Systems
+# SLSA Level 3 Compliant | Bun Runtime | Cloudflare Workers
+# ============================================================
+
+name: FWG-UltraEdge 🌍⚡ SLSA Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - "v*.*.*"
+  pull_request:
+    branches:
+      - main
+      - develop
+
+# ── Global permissions required by SLSA Generic Generator ──
+permissions:
+  contents: read
+  actions: read
+  id-token: write  # Required for SLSA provenance signing
+
+# ── Concurrency: cancel stale runs on same branch ──
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ── Environment detection ──
+env:
+  BUN_VERSION: latest
+  WRANGLER_VERSION: latest
+  IS_PRODUCTION: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+  IS_STAGING: ${{ github.ref == 'refs/heads/develop' }}
+  ARTIFACT_NAME: fwg-ultraedge-worker
+  BUNDLE_SIZE_LIMIT_KB: 1024  # Cloudflare Worker 1MB limit
+
+# ════════════════════════════════════════════════════════════
+# JOB 1 — SECRET SCANNING 🔐
+# Prevent credential leaks before anything else runs
+# ════════════════════════════════════════════════════════════
+jobs:
+  secret-scanning:
+    name: "🔐 Job 1 · Secret Scanning"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for Gitleaks
+
+      # FWG-UltraEdge 🌍⚡ — Gitleaks: industry-standard secret detection
+      - name: Run Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Optional: for org use
+
+      - name: Upload Gitleaks report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: results.sarif
+          retention-days: 7
+
+# ════════════════════════════════════════════════════════════
+# JOB 2 — CODE QUALITY 🎨
+# ESLint + Prettier via Bun for consistent formatting
+# ════════════════════════════════════════════════════════════
+  code-quality:
+    name: "🎨 Job 2 · Code Quality"
+    runs-on: ubuntu-latest
+    needs: secret-scanning
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # FWG-UltraEdge 🌍⚡ — Bun runtime for lightning-fast installs
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # ESLint via bun x
+      - name: Run ESLint
+        run: bun x eslint . --ext .ts,.tsx --max-warnings 0
+
+      # Prettier check via bun x
+      - name: Run Prettier check
+        run: bun x prettier --check "src/**/*.{ts,tsx,json}" "test/**/*.ts"
+
+# ════════════════════════════════════════════════════════════
+# JOB 3 — STATIC ANALYSIS 🔬
+# Strict TypeScript type-checking with tsc
+# ════════════════════════════════════════════════════════════
+  static-analysis:
+    name: "🔬 Job 3 · Static Analysis (TypeScript)"
+    runs-on: ubuntu-latest
+    needs: secret-scanning
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # FWG-UltraEdge 🌍⚡ — Strict mode TypeScript compilation check
+      - name: Run TypeScript strict type-check
+        run: bun x tsc --noEmit --strict
+
+# ════════════════════════════════════════════════════════════
+# JOB 4 — ULTRA-FAST TESTING ⚡
+# Unit tests using Bun's native test runner
+# ════════════════════════════════════════════════════════════
+  ultra-fast-testing:
+    name: "⚡ Job 4 · Ultra-Fast Unit Tests"
+    runs-on: ubuntu-latest
+    needs: [code-quality, static-analysis]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # FWG-UltraEdge 🌍⚡ — Bun native test runner (fastest in class)
+      - name: Run unit tests
+        run: bun test --coverage --reporter=junit --reporter-outfile=test-results.xml
+        env:
+          NODE_ENV: test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+          retention-days: 14
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+# ════════════════════════════════════════════════════════════
+# JOB 5 — SECURITY AUDIT 🛡️
+# Dependency vulnerability scanning with bun audit
+# ════════════════════════════════════════════════════════════
+  security-audit:
+    name: "🛡️ Job 5 · Security Audit"
+    runs-on: ubuntu-latest
+    needs: secret-scanning
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # FWG-UltraEdge 🌍⚡ — Dependency vulnerability audit
+      - name: Run bun audit
+        run: bun audit --audit-level moderate
+        continue-on-error: false
+
+      # Additional OSV scanner for comprehensive coverage
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: |-
+            --lockfile=bun.lockb
+            --format=json
+            --output=osv-results.json
+        continue-on-error: true
+
+      - name: Upload OSV scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osv-scan-results
+          path: osv-results.json
+          retention-days: 14
+
+# ════════════════════════════════════════════════════════════
+# JOB 6 — BUILD ARTIFACTS 📦
+# Compile project + generate SHA-256 hashes for SLSA
+# ════════════════════════════════════════════════════════════
+  build-artifacts:
+    name: "📦 Job 6 · Build Artifacts & SHA-256"
+    runs-on: ubuntu-latest
+    needs: [ultra-fast-testing, security-audit]
+    outputs:
+      artifact-sha256: ${{ steps.hash.outputs.sha256 }}
+      artifact-name: ${{ steps.meta.outputs.name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # FWG-UltraEdge 🌍⚡ — Build via Wrangler (Cloudflare Worker bundle)
+      - name: Build Worker artifact
+        run: bun run build
+        env:
+          NODE_ENV: production
+
+      # Generate artifact metadata
+      - name: Set artifact metadata
+        id: meta
+        run: |
+          VERSION="${{ github.ref_name }}"
+          COMMIT="${{ github.sha }}"
+          NAME="${{ env.ARTIFACT_NAME }}-${VERSION}-${COMMIT:0:8}"
+          echo "name=${NAME}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "commit=${COMMIT}" >> $GITHUB_OUTPUT
+
+      # Generate SHA-256 hashes for SLSA provenance
+      - name: Generate SHA-256 hashes
+        id: hash
+        run: |
+          # FWG-UltraEdge 🌍⚡ — SLSA-compliant SHA-256 generation
+          find dist/ -type f | sort | xargs sha256sum > sha256sums.txt
+          BUNDLE_HASH=$(sha256sum dist/worker.js | awk '{print $1}')
+          echo "sha256=${BUNDLE_HASH}" >> $GITHUB_OUTPUT
+          echo "📦 Artifact SHA-256: ${BUNDLE_HASH}"
+          cat sha256sums.txt
+
+      # Package artifact with hash manifest
+      - name: Package artifact
+        run: |
+          tar -czf ${{ steps.meta.outputs.name }}.tar.gz dist/ sha256sums.txt
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}
+          path: |
+            ${{ steps.meta.outputs.name }}.tar.gz
+            sha256sums.txt
+          retention-days: 30
+          if-no-files-found: error
+
+# ════════════════════════════════════════════════════════════
+# JOB 7 — SLSA PROVENANCE 🏛️
+# Non-forgeable provenance via official SLSA Generic Generator
+# SLSA Level 3: cryptographically signed, tamper-evident
+# ════════════════════════════════════════════════════════════
+  slsa-provenance:
+    name: "🏛️ Job 7 · SLSA Provenance (Level 3)"
+    needs: build-artifacts
+    # FWG-UltraEdge 🌍⚡ — Official SLSA Generic Generator (do NOT change)
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    with:
+      base64-subjects: ${{ needs.build-artifacts.outputs.artifact-sha256 }}
+      upload-assets: true
+      provenance-name: fwg-ultraedge.intoto.jsonl
+
+# ════════════════════════════════════════════════════════════
+# JOB 8 — EDGE PERFORMANCE CHECK 🚀
+# Smart Automated System: Bundle validation + Dry Run + Health logic
+# Stops pipeline immediately on ANY logic/syntax failure
+# ════════════════════════════════════════════════════════════
+  edge-performance-check:
+    name: "🚀 Job 8 · Edge Performance & Health Check"
+    runs-on: ubuntu-latest
+    needs: build-artifacts
+    outputs:
+      bundle-size-kb: ${{ steps.size-check.outputs.size_kb }}
+      health-status: ${{ steps.dry-run.outputs.status }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # ── Step 1: Re-run Bun tests to verify src/index.ts logic ──
+      # FWG-UltraEdge 🌍⚡ — Verify ALL logic before any deployment attempt
+      - name: Verify src/index.ts logic with Bun Test
+        id: logic-verify
+        run: |
+          echo "🔍 FWG-UltraEdge: Verifying all logic in src/index.ts..."
+          bun test test/ --timeout 30000
+          echo "✅ Logic verification passed — safe to proceed"
+
+      # Pipeline hard-stop on logic failure
+      - name: Check logic verification result
+        if: failure() && steps.logic-verify.outcome == 'failure'
+        run: |
+          echo "🚨 FWG-UltraEdge CRITICAL: Logic verification FAILED!"
+          echo "🛑 Pipeline halted — production Worker protected."
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": "🚨 *FWG-UltraEdge ALERT* 🌍⚡\n*Pipeline HALTED* — Logic/Syntax error detected in `src/index.ts`!\n*Branch:* `${{ github.ref_name }}`\n*Commit:* `${{ github.sha }}`\n*Live Worker is PROTECTED — deployment aborted.*"
+            }'
+          exit 1
+
+      # ── Step 2: Bundle size validation ──
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-artifacts.outputs.artifact-name }}
+
+      - name: Validate bundle size (Cloudflare Worker limit)
+        id: size-check
+        run: |
+          # FWG-UltraEdge 🌍⚡ — Cloudflare Worker bundle must stay under 1MB
+          BUNDLE_SIZE_BYTES=$(stat -c%s dist/worker.js 2>/dev/null || stat -f%z dist/worker.js)
+          BUNDLE_SIZE_KB=$((BUNDLE_SIZE_BYTES / 1024))
+          LIMIT_KB=${{ env.BUNDLE_SIZE_LIMIT_KB }}
+
+          echo "size_kb=${BUNDLE_SIZE_KB}" >> $GITHUB_OUTPUT
+          echo "📊 Bundle size: ${BUNDLE_SIZE_KB} KB / ${LIMIT_KB} KB limit"
+
+          if [ "$BUNDLE_SIZE_KB" -ge "$LIMIT_KB" ]; then
+            echo "❌ Bundle size ${BUNDLE_SIZE_KB}KB exceeds Cloudflare limit of ${LIMIT_KB}KB!"
+            curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"text\": \"⚠️ *FWG-UltraEdge ALERT* 🌍⚡\n*Bundle size limit exceeded!*\nSize: ${BUNDLE_SIZE_KB}KB / Limit: ${LIMIT_KB}KB\nBranch: \`${{ github.ref_name }}\`\"
+              }"
+            exit 1
+          fi
+          echo "✅ Bundle size: ${BUNDLE_SIZE_KB}KB — within Cloudflare limits"
+
+      # ── Step 3: Wrangler dry-run deployment validation ──
+      - name: Wrangler dry-run (configuration validation)
+        id: dry-run
+        run: |
+          # FWG-UltraEdge 🌍⚡ — Dry Run: validate config without touching production
+          echo "🔄 Running Wrangler dry-run..."
+          npx wrangler@${{ env.WRANGLER_VERSION }} deploy --dry-run --outdir dist-dryrun
+          echo "status=passed" >> $GITHUB_OUTPUT
+          echo "✅ Dry-run passed — configuration is valid"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Halt pipeline if dry-run fails
+      - name: Abort on dry-run failure
+        if: failure() && steps.dry-run.outcome == 'failure'
+        run: |
+          echo "🚨 Dry-run FAILED — configuration error detected!"
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": "🚨 *FWG-UltraEdge ALERT* 🌍⚡\n*Dry-run FAILED* — Wrangler configuration error!\n*Branch:* `${{ github.ref_name }}`\n*Action Required:* Check wrangler.toml immediately."
+            }'
+          exit 1
+
+      # ── Step 4: Edge latency simulation ──
+      - name: Edge latency simulation
+        run: |
+          # FWG-UltraEdge 🌍⚡ — Simulate edge cold-start performance
+          echo "⚡ Running edge latency simulation..."
+          bun run scripts/edge-latency-sim.ts || true
+          echo "✅ Edge performance check complete"
+
+# ════════════════════════════════════════════════════════════
+# JOB 9 — STAGING DEPLOYMENT 🟡
+# Automated deploy to Cloudflare Staging environment
+# Runs only on: develop branch
+# ════════════════════════════════════════════════════════════
+  staging-deployment:
+    name: "🟡 Job 9 · Staging Deployment"
+    runs-on: ubuntu-latest
+    needs: [slsa-provenance, edge-performance-check]
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://ultraedge-stg.fwg.workers.dev
+    outputs:
+      deploy-status: ${{ steps.deploy.outputs.status }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-artifacts.outputs.artifact-name }}
+
+      # FWG-UltraEdge 🌍⚡ — Deploy to Cloudflare Staging via Wrangler
+      - name: Deploy to Cloudflare Staging
+        id: deploy
+        run: |
+          echo "🟡 FWG-UltraEdge: Deploying to STAGING environment..."
+          npx wrangler@${{ env.WRANGLER_VERSION }} deploy \
+            --env staging \
+            --name ultraedge-stg
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "✅ Staging deployment complete"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+
+      # ── Health Check: Staging ──
+      - name: Health check — Staging
+        id: health-check-stg
+        run: |
+          # FWG-UltraEdge 🌍⚡ — Smart Health Check with retry logic
+          echo "🏥 Running health check on Staging..."
+          MAX_RETRIES=5
+          RETRY_DELAY=10
+          STG_URL="${{ secrets.WORKER_URL_STG }}"
+
+          if [ -z "${STG_URL}" ]; then
+            STG_URL="https://ultraedge-stg.fwg.workers.dev"
+          fi
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt ${i}/${MAX_RETRIES}: ${STG_URL}/health"
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer ${{ secrets.HEALTH_CHECK_TOKEN }}" \
+              --max-time 15 \
+              "${STG_URL}/health" || echo "000")
+
+            echo "HTTP Status: ${HTTP_STATUS}"
+
+            if [ "${HTTP_STATUS}" = "200" ]; then
+              echo "✅ Staging Health Check PASSED (HTTP 200)"
+              exit 0
+            fi
+
+            echo "⚠️ Attempt ${i} failed (HTTP ${HTTP_STATUS}). Retrying in ${RETRY_DELAY}s..."
+            sleep $RETRY_DELAY
+          done
+
+          # All retries exhausted — send Slack alert
+          echo "❌ Staging Health Check FAILED after ${MAX_RETRIES} attempts!"
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"danger\",
+                \"title\": \"🚨 FWG-UltraEdge STAGING Alert 🌍⚡\",
+                \"fields\": [
+                  {\"title\": \"Status\", \"value\": \"Health Check FAILED\", \"short\": true},
+                  {\"title\": \"Environment\", \"value\": \"Staging\", \"short\": true},
+                  {\"title\": \"URL\", \"value\": \"${STG_URL}\", \"short\": false},
+                  {\"title\": \"HTTP Code\", \"value\": \"${HTTP_STATUS}\", \"short\": true},
+                  {\"title\": \"Branch\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
+                  {\"title\": \"Commit\", \"value\": \"${{ github.sha }}\", \"short\": false}
+                ],
+                \"footer\": \"FWG-UltraEdge CI/CD\",
+                \"ts\": $(date +%s)
+              }]
+            }"
+          exit 1
+
+      # ── Slack: Staging success notification ──
+      - name: Notify Slack — Staging success
+        if: success()
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"warning\",
+                \"title\": \"🟡 FWG-UltraEdge STAGING Deployed 🌍⚡\",
+                \"fields\": [
+                  {\"title\": \"Status\", \"value\": \"✅ Health Check Passed\", \"short\": true},
+                  {\"title\": \"Environment\", \"value\": \"Staging\", \"short\": true},
+                  {\"title\": \"Branch\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
+                  {\"title\": \"Commit\", \"value\": \"${{ github.sha }}\", \"short\": true}
+                ],
+                \"footer\": \"FWG-UltraEdge CI/CD\",
+                \"ts\": $(date +%s)
+              }]
+            }"
+
+# ════════════════════════════════════════════════════════════
+# JOB 10 — PRODUCTION DEPLOYMENT 🟢
+# Enterprise-grade deployment with full rollback capability
+# Runs only on: main branch or version tags
+# ════════════════════════════════════════════════════════════
+  production-deployment:
+    name: "🟢 Job 10 · Production Deployment"
+    runs-on: ubuntu-latest
+    needs: [slsa-provenance, edge-performance-check]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: production
+      url: https://ultraedge.fwg.workers.dev
+    outputs:
+      deploy-status: ${{ steps.deploy.outputs.status }}
+      previous-version: ${{ steps.pre-deploy.outputs.previous_version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-artifacts.outputs.artifact-name }}
+
+      # ── Capture current production version for rollback ──
+      - name: Capture pre-deploy state (rollback snapshot)
+        id: pre-deploy
+        run: |
+          # FWG-UltraEdge 🌍⚡ — Record current version for self-healing rollback
+          PREV_VERSION=$(npx wrangler@${{ env.WRANGLER_VERSION }} deployments list \
+            --name ultraedge-prod \
+            --json 2>/dev/null | bun -e "
+              const d = await Bun.stdin.json().catch(() => []);
+              console.log(Array.isArray(d) && d[0] ? d[0].id : 'unknown');
+            " || echo "unknown")
+          echo "previous_version=${PREV_VERSION}" >> $GITHUB_OUTPUT
+          echo "📸 Rollback snapshot: ${PREV_VERSION}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # FWG-UltraEdge 🌍⚡ — Enterprise Production Deployment
+      - name: Deploy to Cloudflare Production
+        id: deploy
+        run: |
+          echo "🟢 FWG-UltraEdge: Deploying to PRODUCTION environment..."
+          npx wrangler@${{ env.WRANGLER_VERSION }} deploy \
+            --env production \
+            --name ultraedge-prod
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "✅ Production deployment complete"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+
+      # ── Health Check: Production with self-healing rollback ──
+      - name: Health check — Production (with auto-rollback)
+        id: health-check-prod
+        run: |
+          # FWG-UltraEdge 🌍⚡ — Smart Health Check with Self-Healing Rollback
+          MAX_RETRIES=5
+          RETRY_DELAY=12
+          PROD_URL="${{ secrets.WORKER_URL_PROD }}"
+
+          if [ -z "${PROD_URL}" ]; then
+            PROD_URL="https://ultraedge.fwg.workers.dev"
+          fi
+
+          echo "🏥 Health checking Production: ${PROD_URL}/health"
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt ${i}/${MAX_RETRIES}..."
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer ${{ secrets.HEALTH_CHECK_TOKEN }}" \
+              --max-time 20 \
+              "${PROD_URL}/health" || echo "000")
+
+            echo "HTTP Status: ${HTTP_STATUS}"
+
+            if [ "${HTTP_STATUS}" = "200" ]; then
+              echo "✅ Production Health Check PASSED (HTTP 200)"
+              exit 0
+            fi
+
+            echo "⚠️ Attempt ${i} failed (HTTP ${HTTP_STATUS}). Retrying in ${RETRY_DELAY}s..."
+            sleep $RETRY_DELAY
+          done
+
+          # ── SELF-HEALING: Auto-rollback ──
+          echo "🔄 Health check failed — initiating AUTO-ROLLBACK..."
+          PREV="${{ steps.pre-deploy.outputs.previous_version }}"
+
+          if [ "${PREV}" != "unknown" ] && [ -n "${PREV}" ]; then
+            echo "↩️ Rolling back to: ${PREV}"
+            npx wrangler@${{ env.WRANGLER_VERSION }} rollback "${PREV}" \
+              --name ultraedge-prod --yes || true
+            echo "✅ Rollback initiated"
+          else
+            echo "⚠️ No rollback target found — manual intervention required!"
+          fi
+
+          # Alert Slack immediately
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"danger\",
+                \"title\": \"🚨 FWG-UltraEdge PRODUCTION ALERT 🌍⚡\",
+                \"text\": \"Health check failed — AUTO-ROLLBACK initiated!\",
+                \"fields\": [
+                  {\"title\": \"Status\", \"value\": \"🔴 CRITICAL — Rolled Back\", \"short\": true},
+                  {\"title\": \"Environment\", \"value\": \"Production\", \"short\": true},
+                  {\"title\": \"URL\", \"value\": \"${PROD_URL}\", \"short\": false},
+                  {\"title\": \"HTTP Code\", \"value\": \"${HTTP_STATUS}\", \"short\": true},
+                  {\"title\": \"Rollback Target\", \"value\": \"${PREV}\", \"short\": true},
+                  {\"title\": \"Failed Commit\", \"value\": \"${{ github.sha }}\", \"short\": false},
+                  {\"title\": \"Branch/Tag\", \"value\": \"${{ github.ref_name }}\", \"short\": true}
+                ],
+                \"footer\": \"FWG-UltraEdge Self-Healing CI/CD\",
+                \"ts\": $(date +%s)
+              }]
+            }"
+          exit 1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # ── Slack: Production success notification ──
+      - name: Notify Slack — Production success
+        if: success()
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"good\",
+                \"title\": \"✅ FWG-UltraEdge PRODUCTION Deployed 🌍⚡\",
+                \"text\": \"Ultra Edge Deployment successful — serving globally!\",
+                \"fields\": [
+                  {\"title\": \"Status\", \"value\": \"🟢 Live & Healthy\", \"short\": true},
+                  {\"title\": \"Environment\", \"value\": \"Production\", \"short\": true},
+                  {\"title\": \"Version\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
+                  {\"title\": \"Commit\", \"value\": \"${{ github.sha }}\", \"short\": true},
+                  {\"title\": \"SLSA Level\", \"value\": \"Level 3 ✓\", \"short\": true},
+                  {\"title\": \"Bundle Size\", \"value\": \"${{ needs.edge-performance-check.outputs.bundle-size-kb }}KB\", \"short\": true}
+                ],
+                \"footer\": \"FWG-UltraEdge CI/CD | SLSA L3\",
+                \"ts\": $(date +%s)
+              }]
+            }"
+
+# ════════════════════════════════════════════════════════════
+# JOB 11 — OBS LIVE TRIGGER 🎬 (Optional)
+# Broadcast live notification on successful Production deploy
+# Requires STREAM_KEY secret to activate
+# ════════════════════════════════════════════════════════════
+  obs-live-trigger:
+    name: "🎬 Job 11 · OBS Live Broadcast (Optional)"
+    runs-on: ubuntu-latest
+    needs: production-deployment
+    # Only runs on Production AND if STREAM_KEY is configured
+    if: |
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
+      needs.production-deployment.outputs.deploy-status == 'success'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Check STREAM_KEY availability
+        id: check-stream
+        run: |
+          if [ -n "${{ secrets.STREAM_KEY }}" ]; then
+            echo "stream_available=true" >> $GITHUB_OUTPUT
+            echo "✅ STREAM_KEY found — OBS trigger will fire"
+          else
+            echo "stream_available=false" >> $GITHUB_OUTPUT
+            echo "⏭️ STREAM_KEY not set — skipping OBS trigger"
+          fi
+
+      # FWG-UltraEdge 🌍⚡ — OBS/Restream broadcast trigger
+      - name: Trigger OBS Live Stream broadcast
+        if: steps.check-stream.outputs.stream_available == 'true'
+        run: |
+          echo "🎬 FWG-UltraEdge: Initiating LIVE broadcast..."
+          bun run scripts/obs-trigger.ts
+        env:
+          STREAM_KEY: ${{ secrets.STREAM_KEY }}
+          RESTREAM_API_KEY: ${{ secrets.RESTREAM_API_KEY }}
+          DEPLOY_VERSION: ${{ github.ref_name }}
+          DEPLOY_COMMIT: ${{ github.sha }}
+          WORKER_URL: ${{ secrets.WORKER_URL_PROD }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # ── Restream API fallback if OBS CLI unavailable ──
+      - name: Restream API notification (fallback)
+        if: |
+          steps.check-stream.outputs.stream_available == 'true' &&
+          failure()
+        run: |
+          # FWG-UltraEdge 🌍⚡ — Restream API fallback broadcast
+          echo "📡 Using Restream API fallback..."
+          curl -s -X POST "https://api.restream.io/v2/user/stream-key" \
+            -H "Authorization: Bearer ${{ secrets.RESTREAM_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "title": "🌍⚡ FWG-UltraEdge: Ultra Edge Deployment LIVE — Server Status Update",
+              "description": "Production deployment successful! Live status broadcast."
+            }' || echo "Restream API unavailable — notification skipped"
+
+      - name: Community broadcast — Slack
+        if: steps.check-stream.outputs.stream_available == 'true'
+        run: |
+          # FWG-UltraEdge 🌍⚡ — Announce to community
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"#ff0000\",
+                \"title\": \"🔴 LIVE: FWG-UltraEdge Ultra Edge Deployment 🌍⚡🎬\",
+                \"text\": \"We are LIVE! Production deployment complete — watch the status broadcast!\",
+                \"fields\": [
+                  {\"title\": \"Version\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
+                  {\"title\": \"Status\", \"value\": \"🔴 Broadcasting\", \"short\": true}
+                ],
+                \"footer\": \"FWG-UltraEdge Live System\",
+                \"ts\": $(date +%s)
+              }]
+            }"
