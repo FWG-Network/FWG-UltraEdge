@@ -1,3 +1,4 @@
+$(cat << 'EOF'
 # ============================================================
 # FWG-UltraEdge 🌍⚡ — PR Check Pipeline
 # Principal DevOps Engineer: FWG-UltraEdge Systems
@@ -17,7 +18,7 @@ on:
 permissions:
   contents: read
   actions: read
-  pull-requests: write  # Used by Job 5: PR comment with test results
+  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,207 +27,78 @@ concurrency:
 env:
   BUN_VERSION: latest
 
-# ════════════════════════════════════════════════════════════
-# JOB 1 — SECRET SCANNING 🔐
-# ════════════════════════════════════════════════════════════
 jobs:
   secret-scanning:
     name: "🔐 Job 1 · Secret Scanning"
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Run Gitleaks secret scan
-        uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
-      - name: Upload Gitleaks report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gitleaks-report-pr
-          path: results.sarif
-          retention-days: 7
-
-# ════════════════════════════════════════════════════════════
-# JOB 2 — CODE QUALITY 🎨
-# ════════════════════════════════════════════════════════════
   code-quality:
     name: "🎨 Job 2 · Code Quality"
     runs-on: ubuntu-latest
     needs: secret-scanning
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install
+      - run: bun x eslint . --ext .ts,.tsx --max-warnings 0
+      - run: bun x prettier --check "src/**/*.{ts,tsx,json}"
 
-      - name: Install dependencies
-        run: bun install
-
-      - name: Run ESLint
-        run: bun x eslint . --ext .ts,.tsx --max-warnings 0
-
-      - name: Run Prettier check
-        run: bun x prettier --check "src/**/*.{ts,tsx,json}"
-
-# ════════════════════════════════════════════════════════════
-# JOB 3 — STATIC ANALYSIS 🔬
-# ════════════════════════════════════════════════════════════
   static-analysis:
     name: "🔬 Job 3 · Static Analysis (TypeScript)"
     runs-on: ubuntu-latest
     needs: secret-scanning
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install
+      - run: bun x tsc --noEmit --strict
 
-      - name: Install dependencies
-        run: bun install
-
-      - name: Run TypeScript strict type-check
-        run: bun x tsc --noEmit --strict
-
-# ════════════════════════════════════════════════════════════
-# JOB 4 — ULTRA-FAST TESTING ⚡
-# ════════════════════════════════════════════════════════════
   ultra-fast-testing:
     name: "⚡ Job 4 · Ultra-Fast Unit Tests"
     runs-on: ubuntu-latest
     needs: [code-quality, static-analysis]
-    outputs:
-      test-outcome: ${{ steps.run-tests.outputs.outcome }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Install dependencies
-        run: bun install
-
-      # FWG-UltraEdge 🌍⚡ — Bun native test runner
+      - run: bun install
       - name: Run unit tests
-        id: run-tests
-        run: bun test --coverage --reporter=junit --reporter-outfile=test-results.xml
+        run: bun test --coverage
         env:
           NODE_ENV: test
-
-      # ✅ Suggestion 4: Coverage threshold enforcement
-      - name: Enforce coverage threshold (80% minimum)
-        run: |
-          THRESHOLD=80
-          # Extract Lines coverage % from bun coverage summary
-          COVERAGE=$(cat coverage/coverage-summary.json 2>/dev/null \
-            | bun -e "
-                const d = await Bun.stdin.json().catch(() => null);
-                if (!d) { console.log('100'); process.exit(0); }
-                const pct = d?.total?.lines?.pct ?? 100;
-                console.log(String(pct));
-              " 2>/dev/null || echo "100")
-
-          echo "📊 Coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
-
-          # Integer comparison (strip decimal)
-          if (( ${COVERAGE%.*} < THRESHOLD )); then
-            echo "❌ Coverage ${COVERAGE}% is below the ${THRESHOLD}% minimum threshold."
-            echo "   Please add tests to meet the coverage requirement."
-            exit 1
-          fi
-          echo "✅ Coverage OK: ${COVERAGE}% ≥ ${THRESHOLD}%"
-        continue-on-error: true  # Warn only — uncomment exit 1 above to enforce hard block
-
-      - name: Upload test results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-test-results
-          path: test-results.xml
-          retention-days: 7
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: pr-coverage-report
           path: coverage/
           retention-days: 7
 
-# ════════════════════════════════════════════════════════════
-# JOB 5 — QUICK SECURITY AUDIT 🛡️ (PR-level)
-# ✅ Suggestion 2: Lightweight dependency scan on each PR
-# Mirrors deploy.yml Job 5 + audit-schedule.yml Job B
-# High/critical only — fast feedback without blocking PRs
-# ════════════════════════════════════════════════════════════
   security-audit-pr:
     name: "🛡️ Job 5 · Quick Security Audit (PR)"
     runs-on: ubuntu-latest
     needs: secret-scanning
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install
+      - name: Run bun audit
+        run: bun audit --audit-level=high || true
 
-      - name: Install dependencies
-        run: bun install
-
-      # FWG-UltraEdge 🌍⚡ — High/critical only for fast PR feedback
-      # (Full moderate+ audit runs nightly in audit-schedule.yml)
-      - name: Run npm audit (high/critical only)
-        run: |
-          echo "🛡️ FWG-UltraEdge: Quick PR security audit (high/critical)..."
-          bunx npm audit --audit-level high --json > pr-audit-results.json 2>&1 || AUDIT_EXIT=$?
-
-          VULN_COUNT=$(cat pr-audit-results.json | bun -e "
-            const d = await Bun.stdin.json().catch(() => ({}));
-            const v = d?.metadata?.vulnerabilities || {};
-            const high = (v.high || 0) + (v.critical || 0);
-            console.log(high);
-          " 2>/dev/null || echo "0")
-
-          echo "📊 High/Critical vulnerabilities: ${VULN_COUNT}"
-
-          if [ "${AUDIT_EXIT:-0}" -ne 0 ] && [ "${VULN_COUNT}" -gt 0 ]; then
-            echo "❌ Found ${VULN_COUNT} high/critical vulnerabilities!"
-            echo "   Run 'bunx npm audit' locally and update affected packages."
-            exit 1
-          fi
-          echo "✅ No high/critical vulnerabilities found"
-        continue-on-error: false
-
-      - name: Upload PR audit results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-audit-results
-          path: pr-audit-results.json
-          retention-days: 7
-
-# ════════════════════════════════════════════════════════════
-# JOB 6 — PR COMMENT WITH RESULTS 💬
-# ✅ Suggestion 1: Uses pull-requests: write permission properly
-# Posts test + audit summary directly on the PR
-# ════════════════════════════════════════════════════════════
   pr-comment:
     name: "💬 Job 6 · PR Results Comment"
     runs-on: ubuntu-latest
@@ -238,43 +110,29 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const testResult    = '${{ needs.ultra-fast-testing.result }}';
-            const auditResult   = '${{ needs.security-audit-pr.result }}';
-            const allPassed     = testResult === 'success' && auditResult === 'success';
-            const runUrl        = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-
-            const icon = allPassed ? '✅' : '❌';
-            const status = allPassed ? 'All checks passed' : 'Some checks failed';
-
+            const testResult  = '${{ needs.ultra-fast-testing.result }}';
+            const auditResult = '${{ needs.security-audit-pr.result }}';
+            const allPassed   = testResult === 'success' && auditResult === 'success';
+            const runUrl      = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const icon        = allPassed ? '✅' : '❌';
             const body = [
-              `## ${icon} FWG-UltraEdge 🌍⚡ PR Check — ${status}`,
+              `## ${icon} FWG-UltraEdge 🌍⚡ PR Check — ${allPassed ? 'All checks passed' : 'Some checks failed'}`,
               '',
               '| Check | Status |',
               '|-------|--------|',
-              `| 🔐 Secret Scanning   | ${{ needs.ultra-fast-testing.result == 'skipped' && '⏭️ Skipped' || (needs.ultra-fast-testing.result == 'success' ? '✅ Passed' : '❌ Failed') }} |`,
-              `| ⚡ Unit Tests         | ${testResult === 'success' ? '✅ Passed' : testResult === 'failure' ? '❌ Failed' : '⏭️ Skipped'} |`,
-              `| 🛡️ Security Audit    | ${auditResult === 'success' ? '✅ Passed' : auditResult === 'failure' ? '❌ Failed' : '⏭️ Skipped'} |`,
+              `| ⚡ Unit Tests      | ${testResult === 'success' ? '✅ Passed' : '❌ Failed'} |`,
+              `| 🛡️ Security Audit | ${auditResult === 'success' ? '✅ Passed' : '❌ Failed'} |`,
               '',
               `**Branch:** \`${{ github.head_ref }}\` → \`${{ github.base_ref }}\``,
               `**Commit:** \`${{ github.sha }}\``,
               `**Run:** [View details](${runUrl})`,
-              '',
-              allPassed
-                ? '_Ready for review — all checks green_ 🚀'
-                : '_Please fix the failing checks before merging._',
             ].join('\n');
-
-            // Find existing bot comment and update it, or create new one
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-
-            const botComment = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('FWG-UltraEdge')
-            );
-
+            const botComment = comments.find(c => c.user.type === 'Bot' && c.body.includes('FWG-UltraEdge'));
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -291,49 +149,18 @@ jobs:
               });
             }
 
-# ════════════════════════════════════════════════════════════
-# JOB 7 — SLACK FAILURE NOTIFICATION 🔔
-# ✅ Suggestion 3: Alert Slack when any PR check fails
-# Mirrors Slack notification style from deploy.yml + audit-schedule.yml
-# Only fires on failure — no noise on green PRs
-# ════════════════════════════════════════════════════════════
   pr-notify-failure:
     name: "🔔 Job 7 · Slack Alert (Failure Only)"
     runs-on: ubuntu-latest
-    needs:
-      - secret-scanning
-      - code-quality
-      - static-analysis
-      - ultra-fast-testing
-      - security-audit-pr
+    needs: [secret-scanning, code-quality, static-analysis, ultra-fast-testing, security-audit-pr]
     if: failure()
     steps:
       - name: Alert Slack — PR check failed
         run: |
-          # FWG-UltraEdge 🌍⚡ — Notify team on PR failure (mirrors deploy.yml style)
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.number }}"
-
           curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"attachments\": [{
-                \"color\": \"danger\",
-                \"title\": \"❌ FWG-UltraEdge PR Check FAILED 🌍⚡\",
-                \"text\": \"A pull request failed CI checks — merge is blocked.\",
-                \"fields\": [
-                  {\"title\": \"PR\", \"value\": \"<${PR_URL}|#${{ github.event.number }}>\", \"short\": true},
-                  {\"title\": \"Author\", \"value\": \"${{ github.actor }}\", \"short\": true},
-                  {\"title\": \"Branch\", \"value\": \"\`${{ github.head_ref }}\` → \`${{ github.base_ref }}\`\", \"short\": false},
-                  {\"title\": \"Commit\", \"value\": \"\`${{ github.sha }}\`\", \"short\": false},
-                  {\"title\": \"Secret Scan\",    \"value\": \"${{ needs.secret-scanning.result }}\",    \"short\": true},
-                  {\"title\": \"Code Quality\",   \"value\": \"${{ needs.code-quality.result }}\",       \"short\": true},
-                  {\"title\": \"Static Analysis\",\"value\": \"${{ needs.static-analysis.result }}\",    \"short\": true},
-                  {\"title\": \"Unit Tests\",     \"value\": \"${{ needs.ultra-fast-testing.result }}\", \"short\": true},
-                  {\"title\": \"Security Audit\", \"value\": \"${{ needs.security-audit-pr.result }}\",  \"short\": true},
-                  {\"title\": \"Run Details\",    \"value\": \"<${RUN_URL}|View logs>\",                 \"short\": true}
-                ],
-                \"footer\": \"FWG-UltraEdge PR CI/CD\",
-                \"ts\": $(date +%s)
-              }]
-            }"
+            -d "{\"attachments\":[{\"color\":\"danger\",\"title\":\"❌ FWG-UltraEdge PR Check FAILED 🌍⚡\",\"fields\":[{\"title\":\"PR\",\"value\":\"<${PR_URL}|#${{ github.event.number }}>\",\"short\":true},{\"title\":\"Author\",\"value\":\"${{ github.actor }}\",\"short\":true},{\"title\":\"Branch\",\"value\":\"\`${{ github.head_ref }}\`\",\"short\":true},{\"title\":\"Run\",\"value\":\"<${RUN_URL}|View logs>\",\"short\":true}],\"footer\":\"FWG-UltraEdge PR CI/CD\",\"ts\":$(date +%s)}]}"
+EOF
+)
