@@ -92,10 +92,8 @@ jobs:
       - name: Run ESLint
         run: bun x eslint . --ext .ts,.tsx --max-warnings 0
 
-      # Prettier check via bun x
+      # ✅ FIX Bug #1: Removed duplicate run: key — keep single run command
       - name: Run Prettier check
-        run: |
-          bun x prettier --check "src/**/*.{ts,tsx,json}"
         run: bun x prettier --check "src/**/*.{ts,tsx,json}"
 
 # ════════════════════════════════════════════════════════════
@@ -166,7 +164,7 @@ jobs:
 
 # ════════════════════════════════════════════════════════════
 # JOB 5 — SECURITY AUDIT 🛡️
-# Dependency vulnerability scanning with bun audit
+# Dependency vulnerability scanning
 # ════════════════════════════════════════════════════════════
   security-audit:
     name: "🛡️ Job 5 · Security Audit"
@@ -184,15 +182,24 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      # FWG-UltraEdge 🌍⚡ — Dependency vulnerability audit
-      - name: Run bun audit
-        run: bun audit --audit-level moderate
+      # ✅ FIX Bug #2: bun មិនមាន audit command — ប្រើ bunx npm audit វិញ
+      - name: Run dependency audit
+        run: bunx npm audit --audit-level moderate
         continue-on-error: false
 
-      # FWG-UltraEdge 🌍⚡ — OSV Scanner via CLI (stable)
+      # ✅ FIX Bug #3: OSV install via gh release download (stable + secure)
+      - name: Install OSV Scanner
+        run: |
+          gh release download --repo google/osv-scanner \
+            --pattern "*linux_amd64*" \
+            --dir /tmp \
+            --clobber
+          chmod +x /tmp/osv-scanner* && mv /tmp/osv-scanner* /usr/local/bin/osv-scanner
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run OSV Scanner
         run: |
-          curl -fsSL https://raw.githubusercontent.com/google/osv-scanner/main/scripts/install.sh | sh -s -- -b /usr/local/bin
           osv-scanner --lockfile=bun.lockb --format=json > osv-results.json || true
           cat osv-results.json
         continue-on-error: true
@@ -245,15 +252,18 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "commit=${COMMIT}" >> $GITHUB_OUTPUT
 
-      # Generate SHA-256 hashes for SLSA provenance
+      # ✅ FIX Bug #4: base64-encode SHA256 hash ដើម្បី SLSA generator ទទួលស្គាល់
       - name: Generate SHA-256 hashes
         id: hash
         run: |
           # FWG-UltraEdge 🌍⚡ — SLSA-compliant SHA-256 generation
           find dist/ -type f | sort | xargs sha256sum > sha256sums.txt
           BUNDLE_HASH=$(sha256sum dist/worker.js | awk '{print $1}')
-          echo "sha256=${BUNDLE_HASH}" >> $GITHUB_OUTPUT
+          # Encode as base64 for SLSA Generic Generator (required format)
+          BUNDLE_HASH_B64=$(echo "${BUNDLE_HASH}  dist/worker.js" | base64 -w0)
+          echo "sha256=${BUNDLE_HASH_B64}" >> $GITHUB_OUTPUT
           echo "📦 Artifact SHA-256: ${BUNDLE_HASH}"
+          echo "📦 Base64 encoded: ${BUNDLE_HASH_B64}"
           cat sha256sums.txt
 
       # Package artifact with hash manifest
@@ -701,6 +711,9 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install
 
       - name: Check STREAM_KEY availability
         id: check-stream
