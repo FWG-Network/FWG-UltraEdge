@@ -226,4 +226,4 @@ export default {
       headers,
     });
   },
-} satisfies ExportedHandler<Env>;
+} satisfies ExporteកdHandler<Env>;
