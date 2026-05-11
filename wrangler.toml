@@ -11,7 +11,7 @@ compatibility_flags = ["nodejs_compat"]
 
 # ── FWG-UltraEdge 🌍⚡ Global Optimization ──
 [placement]
-mode = "smart"
+mode = "smart"  # Cloudflare routes requests to nearest PoP automatically
 
 # ── Worker limits ──
 [limits]
@@ -27,14 +27,14 @@ logpush = true
 
 [observability]
 enabled = true
-head_sampling_rate = 1
+head_sampling_rate = 1  # 100% sampling for full visibility
 
 # ── Vars: non-secret environment variables ──
 [vars]
 ENVIRONMENT = "production"
 APP_NAME = "FWG-UltraEdge"
 APP_VERSION = "1.0.0"
-SENTRY_DSN = ""
+SENTRY_DSN = ""  # Set via wrangler secret put SENTRY_DSN
 
 # ════════════════════════════════════
 # KV NAMESPACE BINDINGS
@@ -60,13 +60,6 @@ class_name = "SmartRouter"
 [[migrations]]
 tag = "v1"
 new_classes = ["SmartRouter"]
-
-# ════════════════════════════════════
-# ROUTES
-# ════════════════════════════════════
-[[routes]]
-pattern = "ultraedge.fwg.workers.dev/*"
-zone_name = "fwg.workers.dev"
 
 # ════════════════════════════════════
 # STAGING ENVIRONMENT
@@ -101,10 +94,6 @@ bucket_name = "ultra-edge-videos"
 name = "SMART_ROUTER"
 class_name = "SmartRouter"
 
-[[env.staging.routes]]
-pattern = "ultraedge-stg.fwg.workers.dev/*"
-zone_name = "fwg.workers.dev"
-
 # ════════════════════════════════════
 # PRODUCTION ENVIRONMENT
 # ════════════════════════════════════
@@ -137,10 +126,6 @@ bucket_name = "ultra-edge-videos"
 [[env.production.durable_objects.bindings]]
 name = "SMART_ROUTER"
 class_name = "SmartRouter"
-
-[[env.production.routes]]
-pattern = "ultraedge.fwg.workers.dev/*"
-zone_name = "fwg.workers.dev"
 
 # ── Sentry integration note ──
 # Run: npx wrangler secret put SENTRY_DSN
