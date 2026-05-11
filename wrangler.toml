@@ -11,7 +11,7 @@ compatibility_flags = ["nodejs_compat"]
 
 # ── FWG-UltraEdge 🌍⚡ Global Optimization ──
 [placement]
-mode = "smart"  # Cloudflare routes requests to nearest PoP automatically
+mode = "smart"
 
 # ── Worker limits ──
 [limits]
@@ -21,19 +21,20 @@ cpu_ms = 50
 [build]
 command = "bun run build"
 
-# ── Observability: Logpush + Sentry integration ──
+# ── Observability: Workers Logpush (Wrangler 4.x format) ──
+# ✅ FIX: logpush must be a top-level boolean — NOT an object
+logpush = true
+
 [observability]
 enabled = true
-head_sampling_rate = 1  # 100% sampling for full visibility
-
-# ── Logpush (Advanced Observability) ──
+head_sampling_rate = 1
 
 # ── Vars: non-secret environment variables ──
 [vars]
 ENVIRONMENT = "production"
 APP_NAME = "FWG-UltraEdge"
 APP_VERSION = "1.0.0"
-SENTRY_DSN = ""  # Set via wrangler secret put SENTRY_DSN
+SENTRY_DSN = ""
 
 # ════════════════════════════════════
 # KV NAMESPACE BINDINGS
@@ -74,9 +75,14 @@ zone_name = "fwg.workers.dev"
 name = "ultraedge-stg"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
+logpush = true
 
 [env.staging.placement]
 mode = "smart"
+
+[env.staging.observability]
+enabled = true
+head_sampling_rate = 1
 
 [env.staging.vars]
 ENVIRONMENT = "staging"
@@ -106,9 +112,14 @@ zone_name = "fwg.workers.dev"
 name = "ultraedge-prod"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
+logpush = true
 
 [env.production.placement]
 mode = "smart"
+
+[env.production.observability]
+enabled = true
+head_sampling_rate = 1
 
 [env.production.vars]
 ENVIRONMENT = "production"
