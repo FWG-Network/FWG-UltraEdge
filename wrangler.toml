@@ -27,8 +27,7 @@ enabled = true
 head_sampling_rate = 1  # 100% sampling for full visibility
 
 # ── Logpush (Advanced Observability) ──
-[logpush]
-enabled = true
+logpush = true
 
 # ── Vars: non-secret environment variables ──
 [vars]
