@@ -236,8 +236,16 @@ jobs:
         run: bun install
 
       # FWG-UltraEdge 🌍⚡ — Build via Wrangler (Cloudflare Worker bundle)
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Update npm to latest
+        run: npm install -g npm@latest
+
       - name: Build Worker artifact
-        run: bun run build
+        run: npx wrangler@latest deploy --dry-run --outdir dist
         env:
           NODE_ENV: production
 
@@ -380,7 +388,7 @@ jobs:
         run: |
           # FWG-UltraEdge 🌍⚡ — Dry Run: validate config without touching production
           echo "🔄 Running Wrangler dry-run..."
-          npx wrangler@${{ env.WRANGLER_VERSION }} deploy --dry-run --outdir dist-dryrun
+          npx wrangler@latest deploy --dry-run --outdir dist-dryrun
           echo "status=passed" >> $GITHUB_OUTPUT
           echo "✅ Dry-run passed — configuration is valid"
         env:
@@ -444,7 +452,7 @@ jobs:
         id: deploy
         run: |
           echo "🟡 FWG-UltraEdge: Deploying to STAGING environment..."
-          npx wrangler@${{ env.WRANGLER_VERSION }} deploy \
+          npx wrangler@latest deploy \
             --env staging \
             --name ultraedge-stg
           echo "status=success" >> $GITHUB_OUTPUT
@@ -567,7 +575,7 @@ jobs:
         id: pre-deploy
         run: |
           # FWG-UltraEdge 🌍⚡ — Record current version for self-healing rollback
-          PREV_VERSION=$(npx wrangler@${{ env.WRANGLER_VERSION }} deployments list \
+          PREV_VERSION=$(npx wrangler@latest deployments list \
             --name ultraedge-prod \
             --json 2>/dev/null | bun -e "
               const d = await Bun.stdin.json().catch(() => []);
@@ -584,7 +592,7 @@ jobs:
         id: deploy
         run: |
           echo "🟢 FWG-UltraEdge: Deploying to PRODUCTION environment..."
-          npx wrangler@${{ env.WRANGLER_VERSION }} deploy \
+          npx wrangler@latest deploy \
             --env production \
             --name ultraedge-prod
           echo "status=success" >> $GITHUB_OUTPUT
@@ -633,7 +641,7 @@ jobs:
 
           if [ "${PREV}" != "unknown" ] && [ -n "${PREV}" ]; then
             echo "↩️ Rolling back to: ${PREV}"
-            npx wrangler@${{ env.WRANGLER_VERSION }} rollback "${PREV}" \
+            npx wrangler@latest rollback "${PREV}" \
               --name ultraedge-prod --yes || true
             echo "✅ Rollback initiated"
           else
