@@ -315,7 +315,7 @@ jobs:
 
       # FWG-UltraEdge 🌍⚡ — Build via Wrangler (Cloudflare Worker bundle)
       - name: Build Worker artifact
-        run: npx wrangler@latest deploy --dry-run --outdir dist
+        run: npx wrangler@latest deploy --outdir dist --env production
         env:
           NODE_ENV: production
 

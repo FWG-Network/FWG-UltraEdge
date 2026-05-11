@@ -17,9 +17,6 @@ mode = "smart"  # Cloudflare routes requests to nearest PoP automatically
 [limits]
 cpu_ms = 50
 
-# ── Build configuration (Bun bundler) ──
-[build]
-command = "bun run build"
 
 # ── Observability: Workers Logpush (Wrangler 4.x format) ──
 # ✅ FIX: logpush must be a top-level boolean — NOT an object
