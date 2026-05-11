@@ -187,14 +187,12 @@ jobs:
         run: bun audit --audit-level moderate
         continue-on-error: false
 
-      # Additional OSV scanner for comprehensive coverage
+      # FWG-UltraEdge 🌍⚡ — OSV Scanner via CLI (stable)
       - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v1.9.2
-        with:
-          scan-args: |-
-            --lockfile=bun.lockb
-            --format=json
-            --output=osv-results.json
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/google/osv-scanner/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+          osv-scanner --lockfile=bun.lockb --format=json > osv-results.json || true
+          cat osv-results.json
         continue-on-error: true
 
       - name: Upload OSV scan results
