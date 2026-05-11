@@ -1,32 +1,18 @@
-$(cat << 'EOF'
-# ============================================================
-# FWG-UltraEdge 🌍⚡ — PR Check Pipeline
-# Principal DevOps Engineer: FWG-UltraEdge Systems
-# Runs on: pull_request → main | develop
-# Jobs: Secret Scan → Code Quality → Static Analysis → Tests
-#        → Quick Security Audit → PR Comment → Slack Notify
-# ============================================================
-
-name: FWG-UltraEdge 🌍⚡ PR Check
-
+name: "FWG-UltraEdge PR Check"
 on:
   pull_request:
     branches:
       - main
       - develop
-
 permissions:
   contents: read
   actions: read
   pull-requests: write
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 env:
   BUN_VERSION: latest
-
 jobs:
   secret-scanning:
     name: "🔐 Job 1 · Secret Scanning"
@@ -38,8 +24,6 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-
   code-quality:
     name: "🎨 Job 2 · Code Quality"
     runs-on: ubuntu-latest
@@ -52,9 +36,8 @@ jobs:
       - run: bun install
       - run: bun x eslint . --ext .ts,.tsx --max-warnings 0
       - run: bun x prettier --check "src/**/*.{ts,tsx,json}"
-
   static-analysis:
-    name: "🔬 Job 3 · Static Analysis (TypeScript)"
+    name: "🔬 Job 3 · Static Analysis"
     runs-on: ubuntu-latest
     needs: secret-scanning
     steps:
@@ -64,9 +47,8 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install
       - run: bun x tsc --noEmit --strict
-
   ultra-fast-testing:
-    name: "⚡ Job 4 · Ultra-Fast Unit Tests"
+    name: "⚡ Job 4 · Unit Tests"
     runs-on: ubuntu-latest
     needs: [code-quality, static-analysis]
     steps:
@@ -75,19 +57,11 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install
-      - name: Run unit tests
-        run: bun test --coverage
+      - run: bun test --coverage
         env:
           NODE_ENV: test
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pr-coverage-report
-          path: coverage/
-          retention-days: 7
-
   security-audit-pr:
-    name: "🛡️ Job 5 · Quick Security Audit (PR)"
+    name: "🛡️ Job 5 · Security Audit"
     runs-on: ubuntu-latest
     needs: secret-scanning
     steps:
@@ -96,71 +70,36 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install
-      - name: Run bun audit
-        run: bun audit --audit-level=high || true
-
+      - run: bun audit --audit-level=high || true
   pr-comment:
-    name: "💬 Job 6 · PR Results Comment"
+    name: "💬 Job 6 · PR Comment"
     runs-on: ubuntu-latest
     needs: [ultra-fast-testing, security-audit-pr]
     if: always()
     steps:
-      - name: Post PR results comment
-        uses: actions/github-script@v7
+      - uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const testResult  = '${{ needs.ultra-fast-testing.result }}';
-            const auditResult = '${{ needs.security-audit-pr.result }}';
-            const allPassed   = testResult === 'success' && auditResult === 'success';
-            const runUrl      = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            const icon        = allPassed ? '✅' : '❌';
-            const body = [
-              `## ${icon} FWG-UltraEdge 🌍⚡ PR Check — ${allPassed ? 'All checks passed' : 'Some checks failed'}`,
-              '',
-              '| Check | Status |',
-              '|-------|--------|',
-              `| ⚡ Unit Tests      | ${testResult === 'success' ? '✅ Passed' : '❌ Failed'} |`,
-              `| 🛡️ Security Audit | ${auditResult === 'success' ? '✅ Passed' : '❌ Failed'} |`,
-              '',
-              `**Branch:** \`${{ github.head_ref }}\` → \`${{ github.base_ref }}\``,
-              `**Commit:** \`${{ github.sha }}\``,
-              `**Run:** [View details](${runUrl})`,
-            ].join('\n');
-            const { data: comments } = await github.rest.issues.listComments({
+            const test  = '${{ needs.ultra-fast-testing.result }}';
+            const audit = '${{ needs.security-audit-pr.result }}';
+            const ok    = test === 'success' && audit === 'success';
+            const url   = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const body  = `## ${ok ? '✅' : '❌'} FWG-UltraEdge 🌍⚡ PR Check\n\n| Check | Status |\n|-------|--------|\n| ⚡ Tests | ${test === 'success' ? '✅' : '❌'} |\n| 🛡️ Audit | ${audit === 'success' ? '✅' : '❌'} |\n\n[View Run](${url})`;
+            await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
+              body
             });
-            const botComment = comments.find(c => c.user.type === 'Bot' && c.body.includes('FWG-UltraEdge'));
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
-
   pr-notify-failure:
-    name: "🔔 Job 7 · Slack Alert (Failure Only)"
+    name: "🔔 Job 7 · Slack Alert"
     runs-on: ubuntu-latest
     needs: [secret-scanning, code-quality, static-analysis, ultra-fast-testing, security-audit-pr]
     if: failure()
     steps:
-      - name: Alert Slack — PR check failed
+      - name: Alert Slack
         run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.number }}"
           curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
-            -d "{\"attachments\":[{\"color\":\"danger\",\"title\":\"❌ FWG-UltraEdge PR Check FAILED 🌍⚡\",\"fields\":[{\"title\":\"PR\",\"value\":\"<${PR_URL}|#${{ github.event.number }}>\",\"short\":true},{\"title\":\"Author\",\"value\":\"${{ github.actor }}\",\"short\":true},{\"title\":\"Branch\",\"value\":\"\`${{ github.head_ref }}\`\",\"short\":true},{\"title\":\"Run\",\"value\":\"<${RUN_URL}|View logs>\",\"short\":true}],\"footer\":\"FWG-UltraEdge PR CI/CD\",\"ts\":$(date +%s)}]}"
-EOF
-)
+            -d "{\"text\":\"❌ FWG-UltraEdge PR Check FAILED 🌍⚡\nBranch: \`${{ github.head_ref }}\`\nAuthor: ${{ github.actor }}\"}"
