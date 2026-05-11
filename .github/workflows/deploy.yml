@@ -281,16 +281,16 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       # ── ✅ Cache: Bun modules ────────────────────────────────
-      - name: Setup Node.js 24 LTS
-        uses: actions/setup-node@v4
+      - name: Cache Bun modules
+        uses: actions/cache@v4
         with:
-          node-version: '24'
           path: |
             ~/.bun/install/cache
             node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lockb') }}
           restore-keys: |
             bun-${{ runner.os }}-
+  
       # ────────────────────────────────────────────────────────
 
       # ── ✅ Cache: Node.js + npm + Wrangler binary ────────────
@@ -298,7 +298,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'                           # Built-in npm cache
+          # ✅ NO cache: 'npm' — project uses bun.lockb only
 
       - name: Cache Wrangler binary (npx cache)
         uses: actions/cache@v4
