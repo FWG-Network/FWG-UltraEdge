@@ -11,5 +11,17 @@
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
     "typescript": "^6.0.3"
+  },
+  "name": "fwg-ultraedge",
+  "version": "3.0.0",
+  "scripts": {
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "dev": "wrangler dev --env staging",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "test": "bun test",
+    "typecheck": "bun x tsc --noEmit",
+    "lint": "bun x eslint . --ext .ts,.tsx --max-warnings 0",
+    "format": "bun x prettier --write \"src/**/*.{ts,tsx,json}\""
   }
 }
