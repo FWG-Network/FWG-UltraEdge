@@ -281,9 +281,10 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       # ── ✅ Cache: Bun modules ────────────────────────────────
-      - name: Cache Bun modules
-        uses: actions/cache@v4
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
         with:
+          node-version: '24'
           path: |
             ~/.bun/install/cache
             node_modules
@@ -314,11 +315,14 @@ jobs:
       # ✅ REMOVED: "npm install -g npm@latest" — unnecessary, wastes ~2–3 min
 
       # FWG-UltraEdge 🌍⚡ — Build via Wrangler (Cloudflare Worker bundle)
-      - name: Build Worker artifact
-        run: npx wrangler@latest deploy --dry-run --outdir dist
-        env:
-          NODE_ENV: production
-
+      - name: Cache Wrangler binary (npx cache)
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm/_npx
+          key: wrangler-${{ runner.os }}-${{ env.WRANGLER_VERSION }}-${{ hashFiles('wrangler.toml') }}
+          restore-keys: |
+            wrangler-${{ runner.os }}-
+            
       # Generate artifact metadata
       - name: Set artifact metadata
         id: meta
