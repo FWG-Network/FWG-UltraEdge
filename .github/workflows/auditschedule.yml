@@ -1,0 +1,475 @@
+# ============================================================
+# FWG-UltraEdge 🌍⚡ — Nightly Scheduled Security Audit
+# Principal DevOps Engineer: FWG-UltraEdge Systems
+# Companion to: deploy.yml (11-Job SLSA Pipeline)
+# Schedule: Every night at 02:00 UTC
+# ============================================================
+
+name: FWG-UltraEdge 🌍⚡ Nightly Security Audit
+
+on:
+  schedule:
+    # ── Runs every night at 02:00 UTC ──
+    - cron: "0 2 * * *"
+
+  # ── Allow manual trigger from GitHub Actions UI ──
+  workflow_dispatch:
+    inputs:
+      audit_level:
+        description: "Audit severity level (low | moderate | high | critical)"
+        required: false
+        default: "moderate"
+        type: choice
+        options:
+          - low
+          - moderate
+          - high
+          - critical
+      notify_slack:
+        description: "Send Slack notification even if no issues found"
+        required: false
+        default: "false"
+        type: boolean
+
+# ── Permissions (minimal — read-only for security scans) ──
+permissions:
+  contents: read
+  security-events: write  # Required for SARIF upload to GitHub Security tab
+  actions: read
+
+# ── Prevent parallel audit runs ──
+concurrency:
+  group: ${{ github.workflow }}-nightly-audit
+  cancel-in-progress: false  # Never cancel a running security audit
+
+# ── Shared env — mirrors deploy.yml for consistency ──
+env:
+  BUN_VERSION: latest
+  AUDIT_LEVEL: ${{ github.event.inputs.audit_level || 'moderate' }}
+  NOTIFY_SLACK: ${{ github.event.inputs.notify_slack || 'false' }}
+  ARTIFACT_RETENTION_DAYS: 30
+
+# ════════════════════════════════════════════════════════════
+# JOB A — SECRET SCANNING 🔐 (Nightly Full History)
+# Full-depth Gitleaks scan across all branches
+# ════════════════════════════════════════════════════════════
+jobs:
+  nightly-secret-scan:
+    name: "🔐 Job A · Nightly Secret Scanning"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full git history — catch secrets in old commits
+
+      # FWG-UltraEdge 🌍⚡ — Gitleaks: full-repo nightly sweep
+      - name: Run Gitleaks (full repo scan)
+        id: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      - name: Upload Gitleaks SARIF report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-nightly-${{ github.run_id }}
+          path: results.sarif
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      # Upload SARIF to GitHub Security tab for visibility
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: gitleaks-nightly
+        continue-on-error: true  # Don't fail if sarif file is absent (no findings)
+
+      # ── Slack alert on secret detection ──
+      - name: Alert Slack — Secrets detected
+        if: failure() && steps.gitleaks.outcome == 'failure'
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "attachments": [{
+                "color": "danger",
+                "title": "🚨 FWG-UltraEdge CRITICAL — Secret Leak Detected! 🌍⚡",
+                "text": "Gitleaks nightly scan found potential secrets in the repository!",
+                "fields": [
+                  {"title": "Scan Type", "value": "Full History (all branches)", "short": true},
+                  {"title": "Action Required", "value": "🔴 URGENT: Rotate credentials immediately!", "short": false},
+                  {"title": "Details", "value": "Check GitHub Security tab or artifact: gitleaks-nightly-${{ github.run_id }}", "short": false}
+                ],
+                "footer": "FWG-UltraEdge Nightly Audit",
+                "ts": '"$(date +%s)"'
+              }]
+            }'
+
+# ════════════════════════════════════════════════════════════
+# JOB B — DEPENDENCY VULNERABILITY SCAN 🛡️
+# npm audit + OSV Scanner on latest main branch
+# Mirrors Job 5 in deploy.yml with deeper nightly config
+# ════════════════════════════════════════════════════════════
+  nightly-dependency-audit:
+    name: "🛡️ Job B · Dependency Vulnerability Audit"
+    runs-on: ubuntu-latest
+    outputs:
+      audit-status: ${{ steps.npm-audit.outputs.status }}
+      osv-status: ${{ steps.osv-scan.outputs.status }}
+      vulnerabilities-found: ${{ steps.npm-audit.outputs.vuln_count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # FWG-UltraEdge 🌍⚡ — Bun runtime (mirrors deploy.yml)
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install
+
+      # ── npm audit (bun lacks native audit — mirrors deploy.yml Bug #2 fix) ──
+      - name: Run npm audit
+        id: npm-audit
+        run: |
+          echo "🛡️ FWG-UltraEdge: Running npm audit (level: ${{ env.AUDIT_LEVEL }})..."
+          bunx npm audit --audit-level ${{ env.AUDIT_LEVEL }} --json > npm-audit-results.json 2>&1 || AUDIT_EXIT=$?
+
+          # Extract vulnerability count for reporting
+          VULN_COUNT=$(cat npm-audit-results.json | bun -e "
+            const d = await Bun.stdin.json().catch(() => ({}));
+            const v = d?.metadata?.vulnerabilities || {};
+            console.log(Object.values(v).reduce((a, b) => a + b, 0));
+          " 2>/dev/null || echo "0")
+
+          echo "status=$([[ ${AUDIT_EXIT:-0} -eq 0 ]] && echo 'clean' || echo 'vulnerabilities-found')" >> $GITHUB_OUTPUT
+          echo "vuln_count=${VULN_COUNT}" >> $GITHUB_OUTPUT
+
+          echo "📊 Vulnerabilities found: ${VULN_COUNT}"
+          cat npm-audit-results.json
+        continue-on-error: true
+
+      # ── OSV Scanner (mirrors deploy.yml Bug #3 fix — gh release download) ──
+      - name: Install OSV Scanner
+        run: |
+          gh release download --repo google/osv-scanner \
+            --pattern "*linux_amd64*" \
+            --dir /tmp \
+            --clobber
+          chmod +x /tmp/osv-scanner* && mv /tmp/osv-scanner* /usr/local/bin/osv-scanner
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run OSV Scanner
+        id: osv-scan
+        run: |
+          echo "🔍 FWG-UltraEdge: Running OSV Scanner..."
+          osv-scanner --lockfile=bun.lockb --format=json > osv-results.json 2>&1
+          OSV_EXIT=$?
+
+          echo "status=$([[ ${OSV_EXIT} -eq 0 ]] && echo 'clean' || echo 'vulnerabilities-found')" >> $GITHUB_OUTPUT
+          echo "📊 OSV Scan complete (exit: ${OSV_EXIT})"
+          cat osv-results.json
+        continue-on-error: true
+
+      # ── Aggregate all results into a single nightly report ──
+      - name: Generate combined audit report
+        run: |
+          echo "# FWG-UltraEdge 🌍⚡ Nightly Audit Report" > audit-report.md
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> audit-report.md
+          echo "**Branch:** main | **Run:** ${{ github.run_id }}" >> audit-report.md
+          echo "" >> audit-report.md
+          echo "## npm audit" >> audit-report.md
+          echo '```json' >> audit-report.md
+          cat npm-audit-results.json >> audit-report.md
+          echo '```' >> audit-report.md
+          echo "" >> audit-report.md
+          echo "## OSV Scanner" >> audit-report.md
+          echo '```json' >> audit-report.md
+          cat osv-results.json >> audit-report.md
+          echo '```' >> audit-report.md
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-audit-report-${{ github.run_id }}
+          path: |
+            npm-audit-results.json
+            osv-results.json
+            audit-report.md
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      # ── Slack alert on vulnerability findings ──
+      - name: Alert Slack — Vulnerabilities found
+        if: |
+          steps.npm-audit.outputs.status == 'vulnerabilities-found' ||
+          steps.osv-scan.outputs.status == 'vulnerabilities-found'
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"warning\",
+                \"title\": \"⚠️ FWG-UltraEdge Nightly Audit — Vulnerabilities Found 🌍⚡\",
+                \"fields\": [
+                  {\"title\": \"npm audit\", \"value\": \"${{ steps.npm-audit.outputs.status }}\", \"short\": true},
+                  {\"title\": \"OSV Scanner\", \"value\": \"${{ steps.osv-scan.outputs.status }}\", \"short\": true},
+                  {\"title\": \"Vulnerabilities (npm)\", \"value\": \"${{ steps.npm-audit.outputs.vuln_count }}\", \"short\": true},
+                  {\"title\": \"Audit Level\", \"value\": \"${{ env.AUDIT_LEVEL }}\", \"short\": true},
+                  {\"title\": \"Report\", \"value\": \"Artifact: nightly-audit-report-${{ github.run_id }}\", \"short\": false}
+                ],
+                \"footer\": \"FWG-UltraEdge Nightly Audit\",
+                \"ts\": $(date +%s)
+              }]
+            }"
+
+      # ── Optional: Notify Slack even if clean (manual trigger only) ──
+      - name: Notify Slack — Audit clean
+        if: |
+          env.NOTIFY_SLACK == 'true' &&
+          steps.npm-audit.outputs.status == 'clean' &&
+          steps.osv-scan.outputs.status == 'clean'
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"good\",
+                \"title\": \"✅ FWG-UltraEdge Nightly Audit — All Clear 🌍⚡\",
+                \"text\": \"No vulnerabilities found in nightly dependency audit.\",
+                \"fields\": [
+                  {\"title\": \"npm audit\", \"value\": \"✅ Clean\", \"short\": true},
+                  {\"title\": \"OSV Scanner\", \"value\": \"✅ Clean\", \"short\": true},
+                  {\"title\": \"Audit Level\", \"value\": \"${{ env.AUDIT_LEVEL }}\", \"short\": true},
+                  {\"title\": \"Date\", \"value\": \"$(date -u '+%Y-%m-%d')\", \"short\": true}
+                ],
+                \"footer\": \"FWG-UltraEdge Nightly Audit\",
+                \"ts\": $(date +%s)
+              }]
+            }"
+
+# ════════════════════════════════════════════════════════════
+# JOB C — CODEQL STATIC ANALYSIS 🔬
+# GitHub CodeQL deep scan for security vulnerabilities
+# Runs nightly on main branch across TypeScript codebase
+# ════════════════════════════════════════════════════════════
+  nightly-codeql:
+    name: "🔬 Job C · CodeQL Deep Static Analysis"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # FWG-UltraEdge 🌍⚡ — Initialize CodeQL for TypeScript
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: +security-extended,security-and-quality
+          # Extended query suite for nightly depth (not in PR checks)
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build for CodeQL analysis
+        run: bun run build
+        env:
+          NODE_ENV: production
+        continue-on-error: true  # CodeQL can analyze even if build has warnings
+
+      # FWG-UltraEdge 🌍⚡ — Perform CodeQL analysis
+      - name: Perform CodeQL Analysis
+        id: codeql
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+          output: codeql-results
+          upload: failure-only  # Only upload on failure to save storage
+
+      - name: Upload CodeQL SARIF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-results-${{ github.run_id }}
+          path: codeql-results/
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+        continue-on-error: true
+
+      # ── Slack alert on CodeQL findings ──
+      - name: Alert Slack — CodeQL issues found
+        if: failure()
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "attachments": [{
+                "color": "danger",
+                "title": "🚨 FWG-UltraEdge — CodeQL Security Issues Found! 🌍⚡",
+                "text": "Nightly CodeQL deep scan detected security vulnerabilities in TypeScript code.",
+                "fields": [
+                  {"title": "Language", "value": "TypeScript / JavaScript", "short": true},
+                  {"title": "Query Suite", "value": "security-extended + security-and-quality", "short": true},
+                  {"title": "Details", "value": "Check GitHub Security tab → Code scanning alerts", "short": false}
+                ],
+                "footer": "FWG-UltraEdge Nightly Audit",
+                "ts": '"$(date +%s)"'
+              }]
+            }'
+
+# ════════════════════════════════════════════════════════════
+# JOB D — LICENSE COMPLIANCE CHECK 📜
+# Verify all dependencies use approved OSS licenses
+# Prevents GPL/AGPL contamination in Cloudflare Worker
+# ════════════════════════════════════════════════════════════
+  nightly-license-check:
+    name: "📜 Job D · License Compliance Check"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install
+
+      # FWG-UltraEdge 🌍⚡ — license-checker: detect GPL/AGPL contamination
+      - name: Install license-checker
+        run: bunx license-checker --version || bunx npm install -g license-checker
+
+      - name: Run license compliance scan
+        id: license-scan
+        run: |
+          echo "📜 FWG-UltraEdge: Scanning dependency licenses..."
+          bunx license-checker \
+            --json \
+            --out license-report.json \
+            --excludePrivatePackages \
+            --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;CC0-1.0;CC-BY-3.0;CC-BY-4.0;Unlicense;0BSD;Python-2.0;BlueOak-1.0.0"
+          echo "✅ All licenses compliant"
+        continue-on-error: true
+
+      - name: Generate license summary
+        if: always()
+        run: |
+          echo "# FWG-UltraEdge 🌍⚡ License Compliance Report" > license-summary.md
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> license-summary.md
+          echo "" >> license-summary.md
+          bunx license-checker --summary >> license-summary.md 2>&1 || true
+
+      - name: Upload license report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report-${{ github.run_id }}
+          path: |
+            license-report.json
+            license-summary.md
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      # ── Slack alert on license violations ──
+      - name: Alert Slack — License violation detected
+        if: failure() && steps.license-scan.outcome == 'failure'
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "attachments": [{
+                "color": "warning",
+                "title": "⚠️ FWG-UltraEdge — License Compliance Violation! 🌍⚡",
+                "text": "A dependency with a non-approved license was detected (GPL/AGPL/LGPL risk).",
+                "fields": [
+                  {"title": "Action Required", "value": "Review license-report artifact and remove/replace the offending package.", "short": false},
+                  {"title": "Allowed Licenses", "value": "MIT, Apache-2.0, BSD-*, ISC, CC0, Unlicense", "short": false}
+                ],
+                "footer": "FWG-UltraEdge Nightly Audit",
+                "ts": '"$(date +%s)"'
+              }]
+            }'
+
+# ════════════════════════════════════════════════════════════
+# JOB E — AUDIT SUMMARY REPORT 📊
+# Consolidate all nightly results → single Slack digest
+# Only runs after all audit jobs complete
+# ════════════════════════════════════════════════════════════
+  nightly-audit-summary:
+    name: "📊 Job E · Nightly Audit Summary"
+    runs-on: ubuntu-latest
+    needs:
+      - nightly-secret-scan
+      - nightly-dependency-audit
+      - nightly-codeql
+      - nightly-license-check
+    if: always()  # Always run summary regardless of individual job results
+    steps:
+      - name: Evaluate overall audit health
+        id: health
+        run: |
+          SECRET_SCAN="${{ needs.nightly-secret-scan.result }}"
+          DEP_AUDIT="${{ needs.nightly-dependency-audit.result }}"
+          CODEQL="${{ needs.nightly-codeql.result }}"
+          LICENSE="${{ needs.nightly-license-check.result }}"
+
+          echo "📊 Results:"
+          echo "  Secret Scan:  ${SECRET_SCAN}"
+          echo "  Dep Audit:    ${DEP_AUDIT}"
+          echo "  CodeQL:       ${CODEQL}"
+          echo "  License:      ${LICENSE}"
+
+          # Determine overall status
+          if [[ "${SECRET_SCAN}" == "success" && "${DEP_AUDIT}" == "success" && \
+                "${CODEQL}" == "success" && "${LICENSE}" == "success" ]]; then
+            echo "overall=clean" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
+            echo "icon=✅" >> $GITHUB_OUTPUT
+          elif [[ "${SECRET_SCAN}" == "failure" ]]; then
+            echo "overall=critical" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+            echo "icon=🚨" >> $GITHUB_OUTPUT
+          else
+            echo "overall=warnings" >> $GITHUB_OUTPUT
+            echo "color=warning" >> $GITHUB_OUTPUT
+            echo "icon=⚠️" >> $GITHUB_OUTPUT
+          fi
+
+      # ── Send consolidated nightly digest to Slack ──
+      - name: Send nightly audit digest to Slack
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"${{ steps.health.outputs.color }}\",
+                \"title\": \"${{ steps.health.outputs.icon }} FWG-UltraEdge Nightly Audit Digest 🌍⚡\",
+                \"text\": \"Nightly security scan complete for $(date -u '+%Y-%m-%d').\",
+                \"fields\": [
+                  {\"title\": \"🔐 Secret Scan\",    \"value\": \"${{ needs.nightly-secret-scan.result }}\",     \"short\": true},
+                  {\"title\": \"🛡️ Dep Audit\",      \"value\": \"${{ needs.nightly-dependency-audit.result }}\",\"short\": true},
+                  {\"title\": \"🔬 CodeQL\",          \"value\": \"${{ needs.nightly-codeql.result }}\",         \"short\": true},
+                  {\"title\": \"📜 License Check\",   \"value\": \"${{ needs.nightly-license-check.result }}\",  \"short\": true},
+                  {\"title\": \"Overall Status\",     \"value\": \"${{ steps.health.outputs.overall }}\",        \"short\": true},
+                  {\"title\": \"Run ID\",             \"value\": \"${{ github.run_id }}\",                       \"short\": true}
+                ],
+                \"footer\": \"FWG-UltraEdge Nightly Audit | $(date -u '+%Y-%m-%d %H:%M UTC')\",
+                \"ts\": $(date +%s)
+              }]
+            }"
