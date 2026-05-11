@@ -45,7 +45,7 @@
     // ── Types: Cloudflare Workers + Bun ─────────────────────────────
     "types": [
       "@cloudflare/workers-types",  // KV, R2, DO, Fetch, etc.
-      "bun-types"                   // Bun runtime globals
+                         // Bun runtime globals
     ],
 
     // ── Path aliases (optional, clean imports) ───────────────────────
