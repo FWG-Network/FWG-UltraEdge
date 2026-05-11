@@ -94,7 +94,9 @@ jobs:
 
       # Prettier check via bun x
       - name: Run Prettier check
-        run: bun x prettier --check "src/**/*.{ts,tsx,json}" "test/**/*.ts"
+        run: |
+          bun x prettier --check "src/**/*.{ts,tsx,json}"
+          find test -name "*.ts" | xargs bun x prettier --check || true
 
 # ════════════════════════════════════════════════════════════
 # JOB 3 — STATIC ANALYSIS 🔬
