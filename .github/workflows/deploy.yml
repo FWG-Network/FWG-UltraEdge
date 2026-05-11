@@ -184,7 +184,7 @@ jobs:
 
       # FWG-UltraEdge - Fix: bun audit command
       - name: Run dependency audit
-          run: bun audit || true
+        run: bun audit || true
         continue-on-error: false
 
       # ✅ FIX Bug #3: OSV install via gh release download (stable + secure)
