@@ -86,7 +86,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       # ESLint via bun x
       - name: Run ESLint
@@ -116,7 +116,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       # FWG-UltraEdge 🌍⚡ — Strict mode TypeScript compilation check
       - name: Run TypeScript strict type-check
@@ -140,7 +140,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       # FWG-UltraEdge 🌍⚡ — Bun native test runner (fastest in class)
       - name: Run unit tests
@@ -182,7 +182,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       # FWG-UltraEdge 🌍⚡ — Dependency vulnerability audit
       - name: Run bun audit
@@ -226,7 +226,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       # FWG-UltraEdge 🌍⚡ — Build via Wrangler (Cloudflare Worker bundle)
       - name: Build Worker artifact
@@ -312,7 +312,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       # ── Step 1: Re-run Bun tests to verify src/index.ts logic ──
       # FWG-UltraEdge 🌍⚡ — Verify ALL logic before any deployment attempt
@@ -422,7 +422,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -545,7 +545,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
