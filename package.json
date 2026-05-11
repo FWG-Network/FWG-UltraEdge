@@ -1,52 +1,10 @@
 {
-  "name": "fwg-ultraedge",
-  "version": "1.0.0",
-  "description": "FWG-UltraEdge 🌍⚡ — Enterprise Cloudflare Worker | SLSA Level 3 | Bun Runtime",
-  "private": true,
-  "scripts": {
-    "dev": "wrangler dev --env staging",
-    "build": "bun build src/index.ts --outdir dist --target browser --minify --sourcemap",
-    "deploy:staging": "wrangler deploy --env staging",
-    "deploy:production": "wrangler deploy --env production",
-    "test": "bun test",
-    "test:watch": "bun test --watch",
-    "test:coverage": "bun test --coverage",
-    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
-    "lint:fix": "eslint . --ext .ts,.tsx --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,json}\" \"test/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\" \"test/**/*.ts\"",
-    "typecheck": "tsc --noEmit --strict",
-    "audit": "bun audit",
-    "hash": "sha256sum dist/worker.js",
-    "edge:sim": "bun run scripts/edge-latency-sim.ts",
-    "obs:trigger": "bun run scripts/obs-trigger.ts",
-    "health:stg": "bun run scripts/health-check.ts --env staging",
-    "health:prod": "bun run scripts/health-check.ts --env production",
-    "rollback": "bun run scripts/rollback.ts"
-  },
   "dependencies": {
-    "@sentry/cloudflare": "^8.0.0",
-    "itty-router": "^5.0.0"
+    "itty-router": "^5.0.23"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
-    "prettier": "^3.0.0",
-    "typescript": "^5.0.0",
-    "wrangler": "latest"
-  },
-  "engines": {
-    "bun": ">=1.0.0"
-  },
-  "keywords": [
-    "cloudflare-workers",
-    "fwg-ultraedge",
-    "slsa",
-    "bun",
-    "edge-computing"
-  ]
+    "@cloudflare/workers-types": "^4.20260511.1",
+    "bun-types": "^1.3.13",
+    "typescript": "^6.0.3"
+  }
 }

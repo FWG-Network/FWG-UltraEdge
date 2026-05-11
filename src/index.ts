@@ -1,3 +1,4 @@
+/// <reference types="@cloudflare/workers-types" />
 // ══════════════════════════════════════════════════════════════════════
 // FWG-UltraEdge 🌍⚡ — src/index.ts
 // Cloudflare Worker Entry Point
