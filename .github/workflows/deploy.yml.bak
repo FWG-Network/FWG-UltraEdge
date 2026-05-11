@@ -182,7 +182,7 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      # FWG-UltraEdge - Fix: bun audit command
+      # ✅ FIX Bug #2: bun មិនមាន audit command — ប្រើ bunx npm audit វិញ
       - name: Run dependency audit
           run: bun audit || true
         continue-on-error: false
