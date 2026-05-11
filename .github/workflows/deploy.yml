@@ -189,7 +189,7 @@ jobs:
 
       # Additional OSV scanner for comprehensive coverage
       - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v2
+        uses: google/osv-scanner-action@v1.9.2
         with:
           scan-args: |-
             --lockfile=bun.lockb

@@ -19,16 +19,16 @@ export interface Env {
   SMART_ROUTER: DurableObjectNamespace;
 
   // Vars (non-secret)
-  ENVIRONMENT:    string;
-  APP_NAME:       string;
+  ENVIRONMENT: string;
+  APP_NAME: string;
   WORKER_VERSION: string;
   CONFIG_API_URL: string;
-  VIDEO_ORIGIN:   string;
+  VIDEO_ORIGIN: string;
 
   // Secrets (set via wrangler secret put)
   HEALTH_CHECK_TOKEN: string;
-  SENTRY_DSN:         string;
-  SLACK_WEBHOOK_URL:  string;
+  SENTRY_DSN: string;
+  SLACK_WEBHOOK_URL: string;
 }
 
 // ── Router setup ─────────────────────────────────────────────────────
@@ -45,28 +45,25 @@ router.get("/health", async (req: Request, env: Env): Promise<Response> => {
   const token = auth.replace("Bearer ", "").trim();
 
   if (env.HEALTH_CHECK_TOKEN && token !== env.HEALTH_CHECK_TOKEN) {
-    return Response.json(
-      { status: "unauthorized", message: "Invalid token" },
-      { status: 401 }
-    );
+    return Response.json({ status: "unauthorized", message: "Invalid token" }, { status: 401 });
   }
 
   // ── Health response ───────────────────────────────────────────────
   return Response.json(
     {
-      status:      "ok",
-      app:         env.APP_NAME       ?? "FWG-UltraEdge",
-      version:     env.WORKER_VERSION ?? "3.0.0",
-      environment: env.ENVIRONMENT    ?? "unknown",
-      timestamp:   new Date().toISOString(),
-      runtime:     "Cloudflare Workers 🌍⚡",
+      status: "ok",
+      app: env.APP_NAME ?? "FWG-UltraEdge",
+      version: env.WORKER_VERSION ?? "3.0.0",
+      environment: env.ENVIRONMENT ?? "unknown",
+      timestamp: new Date().toISOString(),
+      runtime: "Cloudflare Workers 🌍⚡",
     },
     {
-      status:  200,
+      status: 200,
       headers: {
-        "Content-Type":  "application/json",
+        "Content-Type": "application/json",
         "Cache-Control": "no-store",
-        "X-App":         "FWG-UltraEdge",
+        "X-App": "FWG-UltraEdge",
       },
     }
   );
@@ -79,10 +76,10 @@ router.get("/health", async (req: Request, env: Env): Promise<Response> => {
 router.get("/api/config", async (_req: Request, env: Env): Promise<Response> => {
   return Response.json(
     {
-      app:          env.APP_NAME,
-      version:      env.WORKER_VERSION,
-      environment:  env.ENVIRONMENT,
-      videoOrigin:  env.VIDEO_ORIGIN,
+      app: env.APP_NAME,
+      version: env.WORKER_VERSION,
+      environment: env.ENVIRONMENT,
+      videoOrigin: env.VIDEO_ORIGIN,
       configApiUrl: env.CONFIG_API_URL,
     },
     { status: 200 }
@@ -129,9 +126,9 @@ router.get("/api/video/:filename", async (req: Request, env: Env): Promise<Respo
   return new Response(object.body, {
     status: 200,
     headers: {
-      "Content-Type":  object.httpMetadata?.contentType ?? "video/mp4",
+      "Content-Type": object.httpMetadata?.contentType ?? "video/mp4",
       "Cache-Control": "public, max-age=31536000",
-      "X-App":         "FWG-UltraEdge 🌍⚡",
+      "X-App": "FWG-UltraEdge 🌍⚡",
     },
   });
 });
@@ -141,8 +138,8 @@ router.get("/api/video/:filename", async (req: Request, env: Env): Promise<Respo
 // Forward to SmartRouter Durable Object
 // ════════════════════════════════════════════════════════════════════
 router.all("/router/*", async (req: Request, env: Env): Promise<Response> => {
-  const id    = env.SMART_ROUTER.idFromName("global");
-  const stub  = env.SMART_ROUTER.get(id);
+  const id = env.SMART_ROUTER.idFromName("global");
+  const stub = env.SMART_ROUTER.get(id);
   return stub.fetch(req);
 });
 
@@ -152,7 +149,7 @@ router.all("/router/*", async (req: Request, env: Env): Promise<Response> => {
 router.all("*", (): Response => {
   return Response.json(
     {
-      error:   "Not Found",
+      error: "Not Found",
       message: "FWG-UltraEdge 🌍⚡ — Route not found",
     },
     { status: 404 }
@@ -171,14 +168,14 @@ export class SmartRouter {
   }
 
   async fetch(req: Request): Promise<Response> {
-    const url    = new URL(req.url);
+    const url = new URL(req.url);
     const visits = ((await this.state.storage.get<number>("visits")) ?? 0) + 1;
 
     await this.state.storage.put("visits", visits);
 
     return Response.json(
       {
-        path:    url.pathname,
+        path: url.pathname,
         visits,
         message: "FWG-UltraEdge SmartRouter 🌍⚡",
       },
@@ -192,14 +189,10 @@ export class SmartRouter {
 // FWG-UltraEdge 🌍⚡ — fetch handler (required by Cloudflare Workers)
 // ════════════════════════════════════════════════════════════════════
 export default {
-  async fetch(
-    req:     Request,
-    env:     Env,
-    ctx:     ExecutionContext
-  ): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // ── CORS headers ──────────────────────────────────────────────
     const corsHeaders: Record<string, string> = {
-      "Access-Control-Allow-Origin":  "*",
+      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     };
@@ -221,7 +214,7 @@ export default {
     headers.set("X-Environment", env.ENVIRONMENT ?? "unknown");
 
     return new Response(response.body, {
-      status:     response.status,
+      status: response.status,
       statusText: response.statusText,
       headers,
     });
