@@ -15,7 +15,7 @@
   "name": "fwg-ultraedge",
   "version": "3.0.0",
   "scripts": {
-    "build": "npx wrangler@latest deploy --dry-run --outdir dist",
+    "build": "bunx wrangler@latest deploy --dry-run --outdir dist --env \"\"",
     "dev": "wrangler dev --env staging",
     "deploy:staging": "wrangler deploy --env staging",
     "deploy:production": "wrangler deploy --env production",
