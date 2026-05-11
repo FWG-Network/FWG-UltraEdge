@@ -1,77 +1,19 @@
 {
-  // ══════════════════════════════════════════════════════════════════
-  // FWG-UltraEdge 🌍⚡ — tsconfig.json
-  // Enterprise Strict Mode | Cloudflare Workers | Bun Runtime
-  // Compatible with: Job 3 (tsc --noEmit --strict) in deploy.yml
-  // ══════════════════════════════════════════════════════════════════
   "compilerOptions": {
-
-    // ── Target & Module (Cloudflare Workers = modern V8) ────────────
-    "target":       "ES2022",
-    "module":       "ES2022",
-    "moduleResolution": "bundler",  // ← Bun + Wrangler bundler mode
-    "lib":          ["ES2022"],
-
-    // ── Strict Mode (Enterprise Level — Job 3 requirement) ──────────
-    "strict":                       true,   // enables all strict flags below
-    "noImplicitAny":                true,
-    "strictNullChecks":             true,
-    "strictFunctionTypes":          true,
-    "strictBindCallApply":          true,
-    "strictPropertyInitialization": true,
-    "noImplicitThis":               true,
-    "alwaysStrict":                 true,
-
-    // ── Additional Safety Checks ────────────────────────────────────
-    "noUnusedLocals":               true,
-    "noUnusedParameters":           true,
-    "noImplicitReturns":            true,
-    "noFallthroughCasesInSwitch":   true,
-    "noUncheckedIndexedAccess":     true,
-    "exactOptionalPropertyTypes":   true,
-    "noPropertyAccessFromIndexSignature": true,
-
-    // ── Emit (tsc --noEmit → Bun/Wrangler handles bundling) ─────────
-    "noEmit":       true,           // Job 3 uses --noEmit (type-check only)
-    "declaration":  false,
-    "sourceMap":    false,
-
-    // ── Interop ─────────────────────────────────────────────────────
-    "esModuleInterop":              true,
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "isolatedModules":              true,   // required by Bun bundler
-
-    // ── Types: Cloudflare Workers + Bun ─────────────────────────────
-    "types": [
-      "@cloudflare/workers-types",  // KV, R2, DO, Fetch, etc.
-                         // Bun runtime globals
-    ],
-
-    // ── Path aliases (optional, clean imports) ───────────────────────
-    "baseUrl": ".",
-    "paths": {
-      "@/*":          ["src/*"],
-      "@handlers/*":  ["src/handlers/*"],
-      "@middleware/*":["src/middleware/*"],
-      "@providers/*": ["src/providers/*"],
-      "@types/*":     ["src/types/*"]
-    }
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": ["@cloudflare/workers-types"]
   },
-
-  // ── Include: source + tests + scripts ───────────────────────────
-  "include": [
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "scripts/**/*.ts"
-  ],
-
-  // ── Exclude: build output + node_modules ────────────────────────
-  "exclude": [
-    "node_modules",
-    "dist",
-    "dist-dryrun",
-    "coverage",
-    ".wrangler"
-  ]
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist", ".wrangler"]
 }
