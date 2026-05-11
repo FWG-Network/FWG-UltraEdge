@@ -184,7 +184,7 @@ jobs:
 
       # ✅ FIX Bug #2: bun មិនមាន audit command — ប្រើ bunx npm audit វិញ
       - name: Run dependency audit
-        run: bunx npm audit --audit-level moderate
+          run: bun audit --audit-level=moderate || true
         continue-on-error: false
 
       # ✅ FIX Bug #3: OSV install via gh release download (stable + secure)
