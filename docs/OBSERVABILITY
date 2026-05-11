@@ -1,0 +1,19 @@
+# FWG-UltraEdge 🌍⚡ — Observability Guide
+
+## Sentry Integration
+1. Get DSN from https://sentry.io
+2. Run: wrangler secret put SENTRY_DSN --env production
+3. Errors auto-captured via src/middleware/sentry.ts
+
+## Logpush (Cloudflare Dashboard)
+1. Dash → Workers & Pages → FWG-Network → Logpush
+2. Create pipeline → destination: R2 or HTTP endpoint
+3. Fields: timestamp, outcome, logs, exceptions
+
+## Health Check Monitoring
+- Staging:    https://fwg-network-staging.fasterwgseverkh.workers.dev/health
+- Production: https://fwg-network.fasterwgseverkh.workers.dev/health
+
+## Slack Alerts
+Configured via SLACK_WEBHOOK_URL secret
+Triggers: deploy fail, health check fail, auto-rollback
