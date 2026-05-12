@@ -32,10 +32,15 @@ export async function minifyJsonResponse(res: Response): Promise<Response> {
     const headers = new Headers(res.headers);
     headers.set("Content-Length", String(new TextEncoder().encode(minified).length));
     return new Response(minified, { status: res.status, headers });
-  } catch { return res; }
+  } catch {
+    return res;
+  }
 }
 
-export async function withFastLoad(req: Request, next: (req: Request) => Promise<Response>): Promise<Response> {
+export async function withFastLoad(
+  req: Request,
+  next: (req: Request) => Promise<Response>
+): Promise<Response> {
   const pathname = new URL(req.url).pathname;
   let res = await next(req);
   res = applyPerformanceHeaders(res, pathname);

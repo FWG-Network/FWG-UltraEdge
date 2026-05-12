@@ -5,7 +5,11 @@ import { healthHandler } from "../handlers/health";
 import { videoHandler, liveStreamHandler, videoListHandler } from "../handlers/video";
 import { kvGetHandler, kvPutHandler, kvDeleteHandler, kvListHandler } from "../handlers/kv";
 import { getAccountInfo, listR2Objects, purgeCache } from "../providers/cloudflare";
-import { getRestreamProfile, getRestreamChannels, getRestreamAnalytics } from "../providers/restream";
+import {
+  getRestreamProfile,
+  getRestreamChannels,
+  getRestreamAnalytics,
+} from "../providers/restream";
 
 export const router = Router();
 
@@ -14,7 +18,12 @@ router.get("/health", (req: Request, env: Env) => healthHandler(req, env));
 
 // ── Config ──
 router.get("/api/config", (_req: Request, env: Env) =>
-  Response.json({ ok: true, app: env.APP_NAME, version: env.APP_VERSION, environment: env.ENVIRONMENT })
+  Response.json({
+    ok: true,
+    app: env.APP_NAME,
+    version: env.APP_VERSION,
+    environment: env.ENVIRONMENT,
+  })
 );
 
 // ── Account ──

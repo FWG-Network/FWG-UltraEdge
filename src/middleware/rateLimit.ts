@@ -41,10 +41,7 @@ export async function withRateLimit(
 
   try {
     // ── Read current record ──
-    const raw = await env.ULTRA_EDGE_KV.get<RateLimitRecord>(
-      key,
-      "json"
-    );
+    const raw = await env.ULTRA_EDGE_KV.get<RateLimitRecord>(key, "json");
 
     const record: RateLimitRecord = raw ?? {
       count: 0,

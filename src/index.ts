@@ -17,11 +17,7 @@ const corsHeaders = {
 };
 
 export default {
-  async fetch(
-    req: Request,
-    env: Env,
-    ctx: ExecutionContext
-  ): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       if (req.method === "OPTIONS") {
         return new Response(null, { status: 204, headers: corsHeaders });
@@ -88,11 +84,7 @@ export default {
   },
 
   // ── Fix: use ScheduledController (not ScheduledEvent) ──
-  async scheduled(
-    controller: ScheduledController,
-    env: Env,
-    ctx: ExecutionContext
-  ): Promise<void> {
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(
       (async () => {
         try {

@@ -4,23 +4,33 @@ import type { Env } from "../types/env";
 
 export function detectMimeType(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-  const MIME: Record<string,string> = {
-    mp4:"video/mp4", webm:"video/webm", mov:"video/quicktime",
-    mkv:"video/x-matroska", avi:"video/x-msvideo",
-    m3u8:"application/vnd.apple.mpegurl", ts:"video/MP2T",
-    mpd:"application/dash+xml", m4s:"video/iso.segment",
-    jpg:"image/jpeg", png:"image/png", webp:"image/webp",
+  const MIME: Record<string, string> = {
+    mp4: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+    mkv: "video/x-matroska",
+    avi: "video/x-msvideo",
+    m3u8: "application/vnd.apple.mpegurl",
+    ts: "video/MP2T",
+    mpd: "application/dash+xml",
+    m4s: "video/iso.segment",
+    jpg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
   };
   return MIME[ext] ?? "application/octet-stream";
 }
 
-export function parseRange(rangeHeader: string|null, totalSize: number): { start:number; end:number }|null {
+export function parseRange(
+  rangeHeader: string | null,
+  totalSize: number
+): { start: number; end: number } | null {
   if (!rangeHeader) return null;
   const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
   if (!match) return null;
   const start = match[1] ? parseInt(match[1]) : totalSize - parseInt(match[2]);
-  const end   = match[2] ? parseInt(match[2]) : totalSize - 1;
-  if (isNaN(start)||isNaN(end)||start>end||end>=totalSize) return null;
+  const end = match[2] ? parseInt(match[2]) : totalSize - 1;
+  if (isNaN(start) || isNaN(end) || start > end || end >= totalSize) return null;
   return { start, end };
 }
 
@@ -32,9 +42,15 @@ export async function streamR2Video(req: Request, env: Env, filename: string): P
     const head = await env.ULTRA_EDGE_VIDEOS.head(filename);
     if (!head) return Response.json({ error: "Video not found" }, { status: 404 });
     const range = parseRange(rangeHeader, head.size);
-    if (!range) return new Response("Range Not Satisfiable", { status: 416, headers: { "Content-Range": `bytes */${head.size}` } });
+    if (!range)
+      return new Response("Range Not Satisfiable", {
+        status: 416,
+        headers: { "Content-Range": `bytes */${head.size}` },
+      });
     const { start, end } = range;
-    const obj = await env.ULTRA_EDGE_VIDEOS.get(filename, { range: { offset: start, length: end - start + 1 } });
+    const obj = await env.ULTRA_EDGE_VIDEOS.get(filename, {
+      range: { offset: start, length: end - start + 1 },
+    });
     if (!obj) return Response.json({ error: "Video not found" }, { status: 404 });
     return new Response(obj.body, {
       status: 206,
@@ -69,10 +85,17 @@ export async function streamR2Video(req: Request, env: Env, filename: string): P
 }
 
 export async function proxyLiveStream(req: Request, originUrl: string): Promise<Response> {
-  const upstream = await fetch(new Request(originUrl, {
-    method: req.method,
-    headers: { "Accept": req.headers.get("Accept")??"*/*", "Range": req.headers.get("Range")??"", "User-Agent": "FWG-UltraEdge/3.0 🌍⚡", "Cache-Control": "no-cache" },
-  }));
+  const upstream = await fetch(
+    new Request(originUrl, {
+      method: req.method,
+      headers: {
+        Accept: req.headers.get("Accept") ?? "*/*",
+        Range: req.headers.get("Range") ?? "",
+        "User-Agent": "FWG-UltraEdge/3.0 🌍⚡",
+        "Cache-Control": "no-cache",
+      },
+    })
+  );
   const headers = new Headers(upstream.headers);
   headers.set("X-Accel-Buffering", "no");
   headers.set("Cache-Control", "no-cache, no-store");

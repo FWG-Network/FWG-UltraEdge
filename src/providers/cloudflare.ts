@@ -31,16 +31,10 @@ export async function getAccountInfo(env: Env): Promise<Response> {
 }
 
 // ── R2 Object Info ──
-export async function getR2ObjectInfo(
-  env: Env,
-  key: string
-): Promise<Response> {
+export async function getR2ObjectInfo(env: Env, key: string): Promise<Response> {
   try {
     if (!key) {
-      return Response.json(
-        { error: "Bad Request", message: "Key is required" },
-        { status: 400 }
-      );
+      return Response.json({ error: "Bad Request", message: "Key is required" }, { status: 400 });
     }
 
     const obj = await env.ULTRA_EDGE_VIDEOS.head(key);
@@ -74,16 +68,10 @@ export async function getR2ObjectInfo(
 }
 
 // ── R2 Delete Object ──
-export async function deleteR2Object(
-  env: Env,
-  key: string
-): Promise<Response> {
+export async function deleteR2Object(env: Env, key: string): Promise<Response> {
   try {
     if (!key) {
-      return Response.json(
-        { error: "Bad Request", message: "Key is required" },
-        { status: 400 }
-      );
+      return Response.json({ error: "Bad Request", message: "Key is required" }, { status: 400 });
     }
 
     await env.ULTRA_EDGE_VIDEOS.delete(key);
@@ -106,17 +94,11 @@ export async function deleteR2Object(
 }
 
 // ── R2 List Objects ──
-export async function listR2Objects(
-  req: Request,
-  env: Env
-): Promise<Response> {
+export async function listR2Objects(req: Request, env: Env): Promise<Response> {
   try {
     const url = new URL(req.url);
     const prefix = url.searchParams.get("prefix") ?? undefined;
-    const limit = Math.min(
-      parseInt(url.searchParams.get("limit") ?? "100"),
-      1000
-    );
+    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "100"), 1000);
     const cursor = url.searchParams.get("cursor") ?? undefined;
 
     const result = await env.ULTRA_EDGE_VIDEOS.list({
@@ -135,7 +117,7 @@ export async function listR2Objects(
         httpMetadata: o.httpMetadata,
       })),
       truncated: result.truncated,
-      cursor: "cursor" in result ? result.cursor ?? null : null,
+      cursor: "cursor" in result ? (result.cursor ?? null) : null,
       count: result.objects.length,
       timestamp: new Date().toISOString(),
     });
@@ -151,10 +133,7 @@ export async function listR2Objects(
 }
 
 // ── Cache Purge via KV tag ──
-export async function purgeCache(
-  env: Env,
-  keys: string[]
-): Promise<Response> {
+export async function purgeCache(env: Env, keys: string[]): Promise<Response> {
   try {
     if (!keys.length) {
       return Response.json(

@@ -22,40 +22,25 @@ function getAllowedOrigins(env: Env): string[] {
 
 function isAllowed(origin: string | null, allowed: string[]): boolean {
   if (!origin) return false;
-  return (
-    allowed.includes(origin) ||
-    allowed.includes("*") ||
-    origin.endsWith(".fwg.network")
-  );
+  return allowed.includes(origin) || allowed.includes("*") || origin.endsWith(".fwg.network");
 }
 
-export function corsHeaders(
-  req: Request,
-  env: Env
-): Record<string, string> {
+export function corsHeaders(req: Request, env: Env): Record<string, string> {
   const origin = req.headers.get("Origin");
   const allowed = getAllowedOrigins(env);
-  const allowedOrigin = isAllowed(origin, allowed)
-    ? (origin ?? "*")
-    : allowed[0] ?? "*";
+  const allowedOrigin = isAllowed(origin, allowed) ? (origin ?? "*") : (allowed[0] ?? "*");
 
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, X-Request-ID, CF-Ray",
-    "Access-Control-Expose-Headers":
-      "X-Powered-By, X-Environment, X-Response-Time, CF-Ray",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Request-ID, CF-Ray",
+    "Access-Control-Expose-Headers": "X-Powered-By, X-Environment, X-Response-Time, CF-Ray",
     "Access-Control-Max-Age": "86400",
-    "Vary": "Origin",
+    Vary: "Origin",
   };
 }
 
-export function withCors(
-  req: Request,
-  env: Env,
-  next: () => Promise<Response>
-): Promise<Response> {
+export function withCors(req: Request, env: Env, next: () => Promise<Response>): Promise<Response> {
   // ── Preflight ──
   if (req.method === "OPTIONS") {
     return Promise.resolve(

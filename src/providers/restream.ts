@@ -53,10 +53,7 @@ export async function getRestreamProfile(env: Env): Promise<Response> {
       );
     }
 
-    const profile = await restreamFetch<RestreamProfile>(
-      "/user/profile",
-      env.RESTREAM_API_KEY
-    );
+    const profile = await restreamFetch<RestreamProfile>("/user/profile", env.RESTREAM_API_KEY);
 
     return Response.json({
       ok: true,
@@ -88,10 +85,7 @@ export async function getRestreamChannels(env: Env): Promise<Response> {
       );
     }
 
-    const channels = await restreamFetch<RestreamChannel[]>(
-      "/channel/all",
-      env.RESTREAM_API_KEY
-    );
+    const channels = await restreamFetch<RestreamChannel[]>("/channel/all", env.RESTREAM_API_KEY);
 
     return Response.json({
       ok: true,
@@ -129,14 +123,10 @@ export async function toggleRestreamChannel(
       );
     }
 
-    await restreamFetch(
-      `/channel/${channelId}`,
-      env.RESTREAM_API_KEY,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ enabled }),
-      }
-    );
+    await restreamFetch(`/channel/${channelId}`, env.RESTREAM_API_KEY, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    });
 
     return Response.json({
       ok: true,
@@ -188,11 +178,7 @@ export async function getRestreamAnalytics(env: Env): Promise<Response> {
 }
 
 // ── Proxy live stream ──
-export async function proxyLiveStream(
-  req: Request,
-  env: Env,
-  path: string
-): Promise<Response> {
+export async function proxyLiveStream(req: Request, env: Env, path: string): Promise<Response> {
   try {
     const origin = env.VIDEO_ORIGIN;
     if (!origin) {
@@ -206,8 +192,8 @@ export async function proxyLiveStream(
     const res = await fetch(upstream, {
       headers: {
         "User-Agent": "FWG-UltraEdge/3.0.0",
-        "Accept": req.headers.get("Accept") ?? "*/*",
-        "Range": req.headers.get("Range") ?? "",
+        Accept: req.headers.get("Accept") ?? "*/*",
+        Range: req.headers.get("Range") ?? "",
       },
     });
 

@@ -21,10 +21,7 @@ function extractBearer(req: Request): string | null {
 }
 
 // ── Public routes (no auth required) ──
-const PUBLIC_PATHS = new Set([
-  "/health",
-  "/api/config",
-]);
+const PUBLIC_PATHS = new Set(["/health", "/api/config"]);
 
 export function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.has(pathname);
@@ -95,10 +92,7 @@ export async function withAuth(
 }
 
 // ── Health check token validator ──
-export function validateHealthToken(
-  req: Request,
-  env: Env
-): boolean {
+export function validateHealthToken(req: Request, env: Env): boolean {
   const token = extractBearer(req);
   const expected = env.HEALTH_CHECK_TOKEN ?? "";
   if (!token || !expected) return false;

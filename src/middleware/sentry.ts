@@ -25,10 +25,7 @@ interface SentryEvent {
 }
 
 // ── Send event to Sentry ──
-async function sendToSentry(
-  dsn: string,
-  event: SentryEvent
-): Promise<void> {
+async function sendToSentry(dsn: string, event: SentryEvent): Promise<void> {
   try {
     // ── Parse DSN ──
     const url = new URL(dsn);
@@ -147,12 +144,10 @@ export async function withSentry(
     // ── Track 5xx as warnings ──
     if (res.status >= 500 && env.SENTRY_DSN) {
       const url = new URL(req.url);
-      await captureMessage(
-        `HTTP ${res.status} on ${url.pathname}`,
-        "warning",
-        env,
-        { status: String(res.status), latency: String(Date.now() - start) }
-      );
+      await captureMessage(`HTTP ${res.status} on ${url.pathname}`, "warning", env, {
+        status: String(res.status),
+        latency: String(Date.now() - start),
+      });
     }
 
     return res;

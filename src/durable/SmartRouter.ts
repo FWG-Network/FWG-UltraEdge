@@ -39,10 +39,7 @@ export class SmartRouter {
       case "/reset":
         return this.handleReset();
       default:
-        return Response.json(
-          { error: "Not Found", path: url.pathname },
-          { status: 404 }
-        );
+        return Response.json({ error: "Not Found", path: url.pathname }, { status: 404 });
     }
   }
 
@@ -64,8 +61,7 @@ export class SmartRouter {
       };
 
       const hits = existing.hits + 1;
-      const avgLatency =
-        Math.round(((existing.avgLatency * existing.hits) + latency) / hits);
+      const avgLatency = Math.round((existing.avgLatency * existing.hits + latency) / hits);
 
       const updated: RouteRecord = {
         path,
@@ -76,10 +72,7 @@ export class SmartRouter {
       };
 
       this.routes.set(path, updated);
-      await this.state.storage.put(
-        "routes",
-        Array.from(this.routes.values())
-      );
+      await this.state.storage.put("routes", Array.from(this.routes.values()));
 
       return Response.json({ ok: true, record: updated });
     } catch {
@@ -89,9 +82,7 @@ export class SmartRouter {
 
   // ── Get all stats ──
   private handleStats(): Response {
-    const data = Array.from(this.routes.values()).sort(
-      (a, b) => b.hits - a.hits
-    );
+    const data = Array.from(this.routes.values()).sort((a, b) => b.hits - a.hits);
     return Response.json({
       ok: true,
       total_routes: data.length,
