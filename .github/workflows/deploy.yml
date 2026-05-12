@@ -375,6 +375,7 @@ jobs:
       base64-subjects: ${{ needs.build-artifacts.outputs.artifact-sha256 }}
       upload-assets: true
       provenance-name: fwg-ultraedge.intoto.jsonl
+        private-repository: true
 
 # ════════════════════════════════════════════════════════════
 # JOB 8 — EDGE PERFORMANCE CHECK 🚀
