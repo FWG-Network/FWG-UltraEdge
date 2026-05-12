@@ -456,6 +456,11 @@ jobs:
         with:
           name: ${{ needs.build-artifacts.outputs.artifact-name }}
 
+      - name: Extract build artifact
+        run: |
+          tar -xzf ${{ needs.build-artifacts.outputs.artifact-name }}.tar.gz
+          ls -la dist/
+
       - name: Validate bundle size (Cloudflare Worker limit)
         id: size-check
         run: |
