@@ -196,6 +196,7 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
+          if-no-files-found: ignore
           retention-days: 14
 
 # ════════════════════════════════════════════════════════════
@@ -366,7 +367,7 @@ jobs:
     name: "🏛️ Job 7 · SLSA Provenance (Level 3)"
     needs: build-artifacts
     # FWG-UltraEdge 🌍⚡ — Official SLSA Generic Generator (do NOT change)
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.10.0
     permissions:
       actions: read
       id-token: write
