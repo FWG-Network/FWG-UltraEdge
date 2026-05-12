@@ -15,7 +15,6 @@ mode = "smart"  # Cloudflare routes requests to nearest PoP automatically
 
 # ── Worker limits ──
 [limits]
-cpu_ms = 50
 
 
 # ── Observability: Workers Logpush (Wrangler 4.x format) ──
