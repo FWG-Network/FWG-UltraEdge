@@ -31,7 +31,7 @@ head_sampling_rate = 1  # 100% sampling for full visibility
 ENVIRONMENT = "production"
 APP_NAME = "FWG-UltraEdge"
 APP_VERSION = "1.0.0"
-SENTRY_DSN = ""  # Set via wrangler secret put SENTRY_DSN
+
 
 # ════════════════════════════════════
 # KV NAMESPACE BINDINGS
@@ -56,7 +56,7 @@ class_name = "SmartRouter"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["SmartRouter"]
+new_sqlite_classes = ["SmartRouter"]
 
 # ════════════════════════════════════
 # STAGING ENVIRONMENT
