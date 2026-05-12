@@ -100,3 +100,27 @@ compatibility_flags = ["nodejs_compat"]
 
 [env.production.placement]
 mode = "smart"
+
+# ════════════════════════════════════
+# PRODUCTION BINDINGS (explicit)
+# ════════════════════════════════════
+[env.production.vars]
+ENVIRONMENT = "production"
+APP_NAME = "FWG-UltraEdge"
+APP_VERSION = "3.0.0"
+
+[[env.production.kv_namespaces]]
+binding = "ULTRA_EDGE_KV"
+id = "d23dc04c127a4918a02b3c72bade6d9d"
+
+[[env.production.r2_buckets]]
+binding = "ULTRA_EDGE_VIDEOS"
+bucket_name = "ultra-edge-videos"
+
+[[env.production.durable_objects.bindings]]
+name = "SMART_ROUTER"
+class_name = "SmartRouter"
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["SmartRouter"]
