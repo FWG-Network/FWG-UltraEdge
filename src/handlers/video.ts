@@ -15,7 +15,7 @@ export async function liveStreamHandler(req: Request, env: Env, path: string): P
 
 export async function videoListHandler(env: Env): Promise<Response> {
   try {
-    const listed = await env.R2.list({ limit: 100 });
+    const listed = await env.ULTRA_EDGE_VIDEOS.list({ limit: 100 });
     const videos = listed.objects.map(o => ({ key: o.key, size: o.size, contentType: detectMimeType(o.key), uploaded: o.uploaded, etag: o.etag }));
     return Response.json({ count: videos.length, videos }, { status: 200, headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=30" } });
   } catch {

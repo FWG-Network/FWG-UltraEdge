@@ -29,12 +29,12 @@ export async function streamR2Video(req: Request, env: Env, filename: string): P
   const rangeHeader = req.headers.get("Range");
 
   if (rangeHeader) {
-    const head = await env.R2.head(filename);
+    const head = await env.ULTRA_EDGE_VIDEOS.head(filename);
     if (!head) return Response.json({ error: "Video not found" }, { status: 404 });
     const range = parseRange(rangeHeader, head.size);
     if (!range) return new Response("Range Not Satisfiable", { status: 416, headers: { "Content-Range": `bytes */${head.size}` } });
     const { start, end } = range;
-    const obj = await env.R2.get(filename, { range: { offset: start, length: end - start + 1 } });
+    const obj = await env.ULTRA_EDGE_VIDEOS.get(filename, { range: { offset: start, length: end - start + 1 } });
     if (!obj) return Response.json({ error: "Video not found" }, { status: 404 });
     return new Response(obj.body, {
       status: 206,
@@ -51,7 +51,7 @@ export async function streamR2Video(req: Request, env: Env, filename: string): P
     });
   }
 
-  const obj = await env.R2.get(filename);
+  const obj = await env.ULTRA_EDGE_VIDEOS.get(filename);
   if (!obj) return Response.json({ error: "Video not found" }, { status: 404 });
   return new Response(obj.body, {
     status: 200,
