@@ -5,7 +5,8 @@
 // Runtime: Bun + Wrangler | SLSA Level 3 | Smart Router (DO)
 // ══════════════════════════════════════════════════════════════════════
 
-import { Router } from "itty-router";
+// ── Use centralized router (handlers: health, video, kv) ─────────────
+import { router } from "./router/index";
 
 // ── Environment bindings (defined in wrangler.toml) ──────────────────
 export interface Env {
@@ -30,131 +31,6 @@ export interface Env {
   SENTRY_DSN: string;
   SLACK_WEBHOOK_URL: string;
 }
-
-// ── Router setup ─────────────────────────────────────────────────────
-const router = Router();
-
-// ════════════════════════════════════════════════════════════════════
-// ROUTE: GET /health
-// Used by: Job 8, 9, 10 Health Checks in deploy.yml
-// Returns: 200 OK + build metadata JSON
-// ════════════════════════════════════════════════════════════════════
-router.get("/health", async (req: Request, env: Env): Promise<Response> => {
-  // ── Bearer token validation (HEALTH_CHECK_TOKEN) ──────────────────
-  const auth = req.headers.get("Authorization") ?? "";
-  const token = auth.replace("Bearer ", "").trim();
-
-  if (env.HEALTH_CHECK_TOKEN && token !== env.HEALTH_CHECK_TOKEN) {
-    return Response.json({ status: "unauthorized", message: "Invalid token" }, { status: 401 });
-  }
-
-  // ── Health response ───────────────────────────────────────────────
-  return Response.json(
-    {
-      status: "ok",
-      app: env.APP_NAME ?? "FWG-UltraEdge",
-      version: env.WORKER_VERSION ?? "3.0.0",
-      environment: env.ENVIRONMENT ?? "unknown",
-      timestamp: new Date().toISOString(),
-      runtime: "Cloudflare Workers 🌍⚡",
-    },
-    {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-        "X-App": "FWG-UltraEdge",
-      },
-    }
-  );
-});
-
-// ════════════════════════════════════════════════════════════════════
-// ROUTE: GET /api/config
-// Returns public configuration (non-secret vars)
-// ════════════════════════════════════════════════════════════════════
-router.get("/api/config", async (_req: Request, env: Env): Promise<Response> => {
-  return Response.json(
-    {
-      app: env.APP_NAME,
-      version: env.WORKER_VERSION,
-      environment: env.ENVIRONMENT,
-      videoOrigin: env.VIDEO_ORIGIN,
-      configApiUrl: env.CONFIG_API_URL,
-    },
-    { status: 200 }
-  );
-});
-
-// ════════════════════════════════════════════════════════════════════
-// ROUTE: GET /api/kv/:key
-// Read a value from KV namespace
-// ════════════════════════════════════════════════════════════════════
-router.get("/api/kv/:key", async (req: Request, env: Env): Promise<Response> => {
-  const { key } = (req as Request & { params: Record<string, string> }).params;
-
-  if (!key) {
-    return Response.json({ error: "Key is required" }, { status: 400 });
-  }
-
-  const value = await env.KV.get(key);
-
-  if (value === null) {
-    return Response.json({ error: "Key not found" }, { status: 404 });
-  }
-
-  return Response.json({ key, value }, { status: 200 });
-});
-
-// ════════════════════════════════════════════════════════════════════
-// ROUTE: GET /api/video/:filename
-// Stream video from R2 bucket
-// ════════════════════════════════════════════════════════════════════
-router.get("/api/video/:filename", async (req: Request, env: Env): Promise<Response> => {
-  const { filename } = (req as Request & { params: Record<string, string> }).params;
-
-  if (!filename) {
-    return Response.json({ error: "Filename is required" }, { status: 400 });
-  }
-
-  const object = await env.R2.get(filename);
-
-  if (!object) {
-    return Response.json({ error: "Video not found" }, { status: 404 });
-  }
-
-  return new Response(object.body, {
-    status: 200,
-    headers: {
-      "Content-Type": object.httpMetadata?.contentType ?? "video/mp4",
-      "Cache-Control": "public, max-age=31536000",
-      "X-App": "FWG-UltraEdge 🌍⚡",
-    },
-  });
-});
-
-// ════════════════════════════════════════════════════════════════════
-// ROUTE: ALL /router/*
-// Forward to SmartRouter Durable Object
-// ════════════════════════════════════════════════════════════════════
-router.all("/router/*", async (req: Request, env: Env): Promise<Response> => {
-  const id = env.SMART_ROUTER.idFromName("global");
-  const stub = env.SMART_ROUTER.get(id);
-  return stub.fetch(req);
-});
-
-// ════════════════════════════════════════════════════════════════════
-// ROUTE: 404 catch-all
-// ════════════════════════════════════════════════════════════════════
-router.all("*", (): Response => {
-  return Response.json(
-    {
-      error: "Not Found",
-      message: "FWG-UltraEdge 🌍⚡ — Route not found",
-    },
-    { status: 404 }
-  );
-});
 
 // ════════════════════════════════════════════════════════════════════
 // DURABLE OBJECT: SmartRouter
@@ -202,7 +78,7 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    // ── Route request ─────────────────────────────────────────────
+    // ── Route request via centralized router ──────────────────────
     const response = await router.fetch(req, env, ctx);
 
     // ── Attach CORS + branding headers ────────────────────────────
