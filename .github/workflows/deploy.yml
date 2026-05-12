@@ -375,7 +375,7 @@ jobs:
       base64-subjects: ${{ needs.build-artifacts.outputs.artifact-sha256 }}
       upload-assets: true
       provenance-name: fwg-ultraedge.intoto.jsonl
-        private-repository: true
+      private-repository: true
 
 # ════════════════════════════════════════════════════════════
 # JOB 8 — EDGE PERFORMANCE CHECK 🚀
@@ -415,7 +415,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-
+          cache: 'npm'
 
       - name: Cache Wrangler binary (npx cache)
         uses: actions/cache@v4
