@@ -336,7 +336,7 @@ jobs:
         run: |
           find dist/ -type f | sort | xargs sha256sum > sha256sums.txt
           BUNDLE_HASH=$(sha256sum dist/worker.js | awk '{print $1}')
-          BUNDLE_HASH_B64=$(echo -n "${BUNDLE_HASH}" | base64 -w0)
+          BUNDLE_HASH_B64=$(echo "${BUNDLE_HASH}  dist/worker.js" | base64 -w0)
           echo "sha256=${BUNDLE_HASH_B64}" >> $GITHUB_OUTPUT
           echo "📦 Artifact SHA-256: ${BUNDLE_HASH}"
           echo "📦 Base64 encoded: ${BUNDLE_HASH_B64}"
@@ -458,7 +458,7 @@ jobs:
 
       - name: Extract build artifact
         run: |
-          tar -xzf ${{ needs.build-artifacts.outputs.artifact-name }}.tar.gz
+          tar -xzf *.tar.gz
           ls -la dist/
 
       - name: Validate bundle size (Cloudflare Worker limit)
