@@ -292,12 +292,11 @@ jobs:
             bun-${{ runner.os }}-
       # ────────────────────────────────────────────────────────
 
-      # ── ✅ Cache: Node.js + npm + Wrangler binary ────────────
+      # ── ✅ Cache: Node.js + Wrangler binary (pinned) ─────────
       - name: Setup Node.js 24 LTS
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-                                     
 
       - name: Cache Wrangler binary (npx cache)
         uses: actions/cache@v4
@@ -311,13 +310,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # ✅ REMOVED: "npm install -g npm@latest" — unnecessary, wastes ~2–3 min
-
-      # FWG-UltraEdge 🌍⚡ — Build via Wrangler (Cloudflare Worker bundle)
+      # FWG-UltraEdge 🌍⚡ — Build-only via Wrangler (no live deploy)
+      # SLSA Level 3: pinned version, no network side-effects at build stage
       - name: Build Worker artifact
-        run: npx wrangler@latest deploy --outdir dist --env production
+        run: npx wrangler@${{ env.WRANGLER_VERSION }} deploy --dry-run --outdir dist --env production
         env:
           NODE_ENV: production
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # Generate artifact metadata
       - name: Set artifact metadata
@@ -334,10 +334,8 @@ jobs:
       - name: Generate SHA-256 hashes
         id: hash
         run: |
-          # FWG-UltraEdge 🌍⚡ — SLSA-compliant SHA-256 generation
           find dist/ -type f | sort | xargs sha256sum > sha256sums.txt
           BUNDLE_HASH=$(sha256sum dist/worker.js | awk '{print $1}')
-          # Encode as base64 for SLSA Generic Generator (required format)
           BUNDLE_HASH_B64=$(echo "${BUNDLE_HASH}  dist/worker.js" | base64 -w0)
           echo "sha256=${BUNDLE_HASH_B64}" >> $GITHUB_OUTPUT
           echo "📦 Artifact SHA-256: ${BUNDLE_HASH}"
