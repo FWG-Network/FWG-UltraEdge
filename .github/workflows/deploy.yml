@@ -335,8 +335,8 @@ jobs:
         id: hash
         run: |
           find dist/ -type f | sort | xargs sha256sum > sha256sums.txt
-          BUNDLE_HASH=$(sha256sum dist/worker.js | awk '{print $1}')
-          BUNDLE_HASH_B64=$(echo "${BUNDLE_HASH}  dist/worker.js" | base64 -w0)
+          BUNDLE_HASH=$(sha256sum dist/index.js | awk '{print $1}')
+          BUNDLE_HASH_B64=$(echo "${BUNDLE_HASH}  dist/index.js" | base64 -w0)
           echo "sha256=${BUNDLE_HASH_B64}" >> $GITHUB_OUTPUT
           echo "📦 Artifact SHA-256: ${BUNDLE_HASH}"
           echo "📦 Base64 encoded: ${BUNDLE_HASH_B64}"
@@ -465,7 +465,7 @@ jobs:
         id: size-check
         run: |
           # FWG-UltraEdge 🌍⚡ — Cloudflare Worker bundle must stay under 1MB
-          BUNDLE_SIZE_BYTES=$(wc -c < dist/worker.js)
+          BUNDLE_SIZE_BYTES=$(wc -c < dist/index.js)
           BUNDLE_SIZE_KB=$((BUNDLE_SIZE_BYTES / 1024))
           LIMIT_KB=${{ env.BUNDLE_SIZE_LIMIT_KB }}
 
