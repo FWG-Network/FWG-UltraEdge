@@ -525,7 +525,7 @@ jobs:
     name: "🟡 Job 9 · Staging Deployment"
     runs-on: ubuntu-latest
     needs: [slsa-provenance, edge-performance-check]
-    if: github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
     environment:
       name: staging
       url: https://ultraedge-stg.fwg.workers.dev

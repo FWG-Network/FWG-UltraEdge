@@ -20,7 +20,6 @@ cpu_ms = 50
 
 # ── Observability: Workers Logpush (Wrangler 4.x format) ──
 # ✅ FIX: logpush must be a top-level boolean — NOT an object
-logpush = true
 
 [observability]
 enabled = true
@@ -65,7 +64,6 @@ new_sqlite_classes = ["SmartRouter"]
 name = "ultraedge-stg"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
-logpush = true
 
 [env.staging.placement]
 mode = "smart"
@@ -98,7 +96,6 @@ class_name = "SmartRouter"
 name = "ultraedge-prod"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
-logpush = true
 
 [env.production.placement]
 mode = "smart"
