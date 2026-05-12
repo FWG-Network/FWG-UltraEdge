@@ -465,7 +465,7 @@ jobs:
         id: size-check
         run: |
           # FWG-UltraEdge 🌍⚡ — Cloudflare Worker bundle must stay under 1MB
-          BUNDLE_SIZE_BYTES=$(stat -c%s dist/worker.js 2>/dev/null || stat -f%z dist/worker.js)
+          BUNDLE_SIZE_BYTES=$(wc -c < dist/worker.js)
           BUNDLE_SIZE_KB=$((BUNDLE_SIZE_BYTES / 1024))
           LIMIT_KB=${{ env.BUNDLE_SIZE_LIMIT_KB }}
 
