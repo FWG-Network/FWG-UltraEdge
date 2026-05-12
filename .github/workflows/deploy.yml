@@ -336,7 +336,7 @@ jobs:
         run: |
           find dist/ -type f | sort | xargs sha256sum > sha256sums.txt
           BUNDLE_HASH=$(sha256sum dist/worker.js | awk '{print $1}')
-          BUNDLE_HASH_B64=$(echo "${BUNDLE_HASH}  dist/worker.js" | base64 -w0)
+          BUNDLE_HASH_B64=$(echo -n "${BUNDLE_HASH}" | base64 -w0)
           echo "sha256=${BUNDLE_HASH_B64}" >> $GITHUB_OUTPUT
           echo "📦 Artifact SHA-256: ${BUNDLE_HASH}"
           echo "📦 Base64 encoded: ${BUNDLE_HASH_B64}"
@@ -415,7 +415,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Cache Wrangler binary (npx cache)
         uses: actions/cache@v4
