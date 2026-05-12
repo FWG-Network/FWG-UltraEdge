@@ -373,7 +373,7 @@ jobs:
       contents: write
     with:
       base64-subjects: ${{ needs.build-artifacts.outputs.artifact-sha256 }}
-      upload-assets: true
+      upload-assets: false
       provenance-name: fwg-ultraedge.intoto.jsonl
       private-repository: true
 
