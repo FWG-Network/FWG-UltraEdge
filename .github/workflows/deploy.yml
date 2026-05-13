@@ -31,6 +31,7 @@ concurrency:
 
 # ── Environment detection ──
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   BUN_VERSION: latest
   WRANGLER_VERSION: latest
   IS_PRODUCTION: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
