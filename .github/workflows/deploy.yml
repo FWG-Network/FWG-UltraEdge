@@ -198,7 +198,6 @@ jobs:
           path: coverage/
           if-no-files-found: ignore
           if-no-files-found: ignore
-          retention-days: 14
 
 # ════════════════════════════════════════════════════════════
 # JOB 5 — SECURITY AUDIT 🛡️
