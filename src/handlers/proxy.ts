@@ -4,7 +4,8 @@ declare function isInNet(ip: string, net: string, mask: string): boolean;
 declare function myIpAddress(): string;
 
 const PAC_SCRIPT = `function FindProxyForURL(url, host) {
-  var proxy = "PROXY 1.1.1.1:443";
+   // កន្លែងកំណត់ Proxy variable 
+  var proxy = "PROXY ultraedge-prod.fasterwgseverkh.workers.dev/:443";
 
   if (
     // --- បន្ថែមសម្រាប់ល្បឿនវីដេអូ (YouTube & Google Video) ---
