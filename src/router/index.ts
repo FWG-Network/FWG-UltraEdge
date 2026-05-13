@@ -10,6 +10,7 @@ import {
   getRestreamChannels,
   getRestreamAnalytics,
 } from "../providers/restream";
+import { handleProxy } from "../handlers/proxy"; // ← បន្ថែម
 
 export const router = Router();
 
@@ -25,6 +26,10 @@ router.get("/api/config", (_req: Request, env: Env) =>
     environment: env.ENVIRONMENT,
   })
 );
+
+// ── Proxy PAC ── ← បន្ថែម
+router.get("/proxy.pac", (req: Request) => handleProxy(req));
+router.get("/wpad.dat", (req: Request) => handleProxy(req));
 
 // ── Account ──
 router.get("/api/account", (_req: Request, env: Env) => getAccountInfo(env));
