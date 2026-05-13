@@ -2,7 +2,6 @@
 import { Router } from "itty-router";
 import type { Env } from "../types/env";
 import { healthHandler } from "../handlers/health";
-import { handleProxy } from '../handlers/proxy'; // ត្រូវប្រាកដថា Path ត្រឹមត្រូវ
 import { videoHandler, liveStreamHandler, videoListHandler } from "../handlers/video";
 import { kvGetHandler, kvPutHandler, kvDeleteHandler, kvListHandler } from "../handlers/kv";
 import { getAccountInfo, listR2Objects, purgeCache } from "../providers/cloudflare";
