@@ -357,7 +357,7 @@ jobs:
             ${{ steps.meta.outputs.name }}.tar.gz
             sha256sums.txt
           retention-days: 30
-          if-no-files-found: error
+          if-no-files-found: ignore
 
   slsa-provenance:
     name: "Job 7 · SLSA Provenance"
@@ -405,7 +405,7 @@ jobs:
         with:
           name: fwg-ultraedge-provenance
           path: fwg-ultraedge.intoto.jsonl
-          if-no-files-found: warn
+          if-no-files-found: ignore
 # ════════════════════════════════════════════════════════════
 # JOB 8 — EDGE PERFORMANCE CHECK 🚀
 # Smart Automated System: Bundle validation + Dry Run + Health logic
