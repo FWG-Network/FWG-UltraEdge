@@ -10,7 +10,10 @@ export default [
         isInNet: "readonly",
         myIpAddress: "readonly",
       }
+    },
+    rules: {
+      "no-undef": "off",
+      "no-unused-vars": "off",
     }
-  },
-  // ... config ដែលមានស្រាប់
-]
+  }
+];
