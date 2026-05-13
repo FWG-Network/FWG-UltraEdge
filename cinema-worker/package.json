@@ -1,0 +1,14 @@
+{
+  "name": "fwg-ultraedge-cinema",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev src/index.ts",
+    "deploy": "wrangler deploy --env production"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "wrangler": "latest",
+    "typescript": "^5.0.0"
+  }
+}
