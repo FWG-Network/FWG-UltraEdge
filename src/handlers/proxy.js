@@ -1,8 +1,3 @@
-// ប្រកាសឱ្យ TypeScript ស្គាល់ Function របស់ PAC Script ដើម្បីកុំឱ្យមាន Error ពេល Compile
-declare function shExpMatch(str: string, shexp: string): boolean;
-declare function isInNet(ip: string, net: string, mask: string): boolean;
-declare function myIpAddress(): string;
-
 const PAC_SCRIPT = `function FindProxyForURL(url, host) {
   var proxy = "PROXY 1.1.1.1:443";
 
@@ -47,30 +42,3 @@ const PAC_SCRIPT = `function FindProxyForURL(url, host) {
 
   return proxy;
 }`;
-
-/**
- * សំយោគការប្រើប្រាស់ Response និង Security Check
- */
-export async function handleProxy(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-
-  // ១. ពិនិត្យ Security: អនុញ្ញាតតែ GET Method
-  if (request.method !== "GET") {
-    return new Response("Method Not Allowed", { status: 405 });
-  }
-
-  // ២. ពិនិត្យ Path: បម្រើតែលើ /proxy.pac ឬ /wpad.dat
-  if (url.pathname !== "/proxy.pac" && url.pathname !== "/wpad.dat") {
-    return new Response("Not Found", { status: 404 });
-  }
-
-  // ៣. បញ្ចេញ PAC Script ជាមួយ Headers ត្រឹមត្រូវ
-  return new Response(PAC_SCRIPT, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/x-ns-proxy-autoconfig",
-      "Cache-Control": "public, max-age=3600",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
-}
