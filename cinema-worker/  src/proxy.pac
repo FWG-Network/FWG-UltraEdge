@@ -1,3 +1,4 @@
+// @ts-nocheck
 export function FindProxyForURL(url, host) { ... }
 
     // 🟢 1. LOCAL NETWORK (រត់ត្រង់ក្នុងស្រុក គ្មាន Delay)
