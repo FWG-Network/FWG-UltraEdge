@@ -30,8 +30,8 @@ router.get("/api/config", (_req: Request, env: Env) =>
 );
 
 // ── Proxy PAC ── ← បន្ថែម
-router.get("/proxy.pac", (req: Request) => handleProxy(req));
-router.get("/wpad.dat", (req: Request) => handleProxy(req));
+import { handleProxy } from '../handlers/proxy'; // ត្រូវប្រាកដថា Path ត្រឹមត្រូវ
+import { Request } from 'express'; // ប្រសិនបើប្រើ Express
 
 // ── Account ──
 router.get("/api/account", (_req: Request, env: Env) => getAccountInfo(env));
