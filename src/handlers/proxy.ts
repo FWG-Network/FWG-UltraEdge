@@ -7,11 +7,7 @@ const PAC_SCRIPT = `function FindProxyForURL(url, host) {
   var proxy = "PROXY proxy.fasterwgserverkh.cloudflareaccess.com:443";
 
   if (
-    // --- បន្ថែមសម្រាប់ល្បឿនវីដេអូ (YouTube & Google Video) ---
-    shExpMatch(host, "*.googlevideo.com") ||
-    shExpMatch(host, "*.youtube.com") ||
-    shExpMatch(host, "*.ytimg.com") ||
-    shExpMatch(host, "youtube.com") ||
+  // --- 
     
     // Cloudflare
     shExpMatch(host, "*.cloudflare.com") ||
@@ -19,7 +15,6 @@ const PAC_SCRIPT = `function FindProxyForURL(url, host) {
     shExpMatch(host, "*ultraedge-prod.fasterwgseverkh.workers.dev") ||
     shExpMatch(host, "*ultraedge-stg.fasterwgseverkh.workers.dev") ||
     
-
     // AWS CDN
     shExpMatch(host, "*.cloudfront.net") ||
     shExpMatch(host, "*.amazonaws.com") ||
@@ -66,7 +61,7 @@ export async function handleProxy(request: Request): Promise<Response> {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
-  // ២. ពិនិត្យ Path: បម្រើតែលើ /proxy.pac ឬ /wpad.dat (ដូចក្នុង Screenshot_2026-05-13-23-08-50-99.jpg)
+  // ២. ពិនិត្យ Path: បម្រើតែលើ /proxy.pac ឬ /wpad.dat
   if (url.pathname !== "/proxy.pac" && url.pathname !== "/wpad.dat") {
     return new Response("Not Found", { status: 404 });
   }
