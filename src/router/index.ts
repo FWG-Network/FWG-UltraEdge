@@ -1,8 +1,8 @@
 // FWG-UltraEdge 🌍⚡ — src/router/index.ts
-import { handleProxy } from "../handlers/proxy"; // line import
 import { Router } from "itty-router";
 import type { Env } from "../types/env";
 import { healthHandler } from "../handlers/health";
+import { handleProxy } from "../handlers/proxy"; // line import
 import { videoHandler, liveStreamHandler, videoListHandler } from "../handlers/video";
 import { kvGetHandler, kvPutHandler, kvDeleteHandler, kvListHandler } from "../handlers/kv";
 import { getAccountInfo, listR2Objects, purgeCache } from "../providers/cloudflare";
