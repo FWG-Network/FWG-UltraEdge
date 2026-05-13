@@ -7,7 +7,11 @@ const PAC_SCRIPT = `function FindProxyForURL(url, host) {
   var proxy = "PROXY proxy.fasterwgserverkh.cloudflareaccess.com:443";
 
   if (
-  // --- 
+  // --- បន្ថែមសម្រាប់ល្បឿនវីដេអូ (YouTube & Google Video) ---
+    shExpMatch(host, "*.googlevideo.com") ||
+    shExpMatch(host, "*.youtube.com") ||
+    shExpMatch(host, "*.ytimg.com") ||
+    shExpMatch(host, "youtube.com") ||
     
     // Cloudflare
     shExpMatch(host, "*.cloudflare.com") ||
