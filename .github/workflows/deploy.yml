@@ -55,7 +55,7 @@ jobs:
 
       # FWG-UltraEdge 🌍⚡ — Gitleaks: industry-standard secret detection
       - name: Run Gitleaks secret scan
-        uses: gitleaks/gitleaks-action@v3
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Optional: for org use
