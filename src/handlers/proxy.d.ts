@@ -1,5 +1,5 @@
 export declare function handleProxy(
   request: Request,
   env: any,
-  ctx: any
-): Promise<Response>;
+  ctx: ExecutionContext
+): Promise<Response> | Response | string;
