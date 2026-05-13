@@ -1,7 +1,5 @@
 // FWG-UltraEdge 🌍⚡ — src/router/index.ts
 import { handleProxy } from "../handlers/proxy"; // line import
-router.get("/proxy.pac", (req: Request) => handleProxy(req)); // route 1
-router.get("/wpad.dat", (req: Request) => handleProxy(req));  // route 2
 import { Router } from "itty-router";
 import type { Env } from "../types/env";
 import { healthHandler } from "../handlers/health";
