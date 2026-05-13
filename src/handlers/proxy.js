@@ -1,4 +1,5 @@
-function FindProxyForURL(url, host) {
+// src/handlers/proxy.d.ts
+export function handleProxy(...args: any[]): any;
   // ១. ត្រូវតែប្រកាសប្រាប់វាថា proxy ជាអក្សរ (String)
   var proxy = "PROXY 1.1.1.1:443";
 
