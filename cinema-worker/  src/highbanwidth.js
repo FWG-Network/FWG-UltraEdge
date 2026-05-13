@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 function FindProxyForURL(url, host) {
 
     // 🟢 1. LOCAL NETWORK
