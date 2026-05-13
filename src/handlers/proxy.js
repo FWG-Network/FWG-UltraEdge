@@ -1,5 +1,3 @@
-/* eslint-disable no-undef */
-
 export function handleProxy(request, env, ctx) {
   // ១. ប្រកាស proxy string
   var proxy = "PROXY 1.1.1.1:443";
