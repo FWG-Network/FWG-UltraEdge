@@ -509,7 +509,7 @@ jobs:
         run: |
           # FWG-UltraEdge 🌍⚡ — Dry Run: validate config without touching production
           echo "🔄 Running Wrangler dry-run..."
-          npx wrangler@latest deploy --dry-run --outdir dist-dryrun
+          npx wrangler@latest deploy --dry-run --outdir dist-dryrun --env production
           echo "status=passed" >> $GITHUB_OUTPUT
           echo "✅ Dry-run passed — configuration is valid"
         env:
