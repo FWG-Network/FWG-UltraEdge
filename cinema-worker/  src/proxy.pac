@@ -1,6 +1,5 @@
 // @ts-nocheck
-export function FindProxyForURL(url, host) { ... }
-
+declare function shExpMatch(str: string, shexp: string): boolean;
     // 🟢 1. LOCAL NETWORK (រត់ត្រង់ក្នុងស្រុក គ្មាន Delay)
     if (isPlainHostName(host) ||
         isInNet(dnsResolve(host), "127.0.0.1", "255.0.0.0") ||
