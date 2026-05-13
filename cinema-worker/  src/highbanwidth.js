@@ -38,11 +38,11 @@ export function handleProxy(...args: any[]): any;    // 🟢 1. LOCAL NETWORK (�
    }
 
     return "PROXY 104.19.237.150:443; PROXY 104.16.132.229:443; PROXY 172.64.145.121:443; " +
-    // 🌍 Multi-region proxy fallback
     "PROXY sg-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
     "PROXY jp-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
     "PROXY us-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
     "DIRECT";
+
     }
     
     // 🎮 3. GAMING (LOW PING - រត់ត្រង់កុំឱ្យ Lag ពេលបងលេងហ្គេម)
