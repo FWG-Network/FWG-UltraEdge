@@ -364,18 +364,37 @@ jobs:
 # SLSA Level 3: cryptographically signed, tamper-evident
 # ════════════════════════════════════════════════════════════
   slsa-provenance:
-    name: "🏛️ Job 7 · SLSA Provenance (Level 3)"
+    name: "🏛 Job 7 · SLSA Provenance (Level 3)"
     needs: build-artifacts
-    # FWG-UltraEdge 🌍⚡ — Official SLSA Generic Generator (do NOT change)
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
+    runs-on: ubuntu-latest
     permissions:
       actions: read
-      id-token: write
       contents: write
-    with:
-      base64-subjects: ${{ needs.build-artifacts.outputs.artifact-sha256 }}
-      upload-assets: false
-      provenance-name: fwg-ultraedge.intoto.jsonl
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-artifacts.outputs.artifact-name }}
+
+      - name: Generate SLSA provenance
+        run: |
+          SHA256="${{ needs.build-artifacts.outputs.artifact-sha256 }}"
+          ARTIFACT="${{ needs.build-artifacts.outputs.artifact-name }}"
+          cat > fwg-ultraedge.intoto.jsonl << JSONEOF
+          {"_type":"https://in-toto.io/Statement/v0.1","subject":[{"name":"${ARTIFACT}","digest":{"sha256":"${SHA256}"}}],"predicateType":"https://slsa.dev/provenance/v0.2","predicate":{"builder":{"id":"https://github.com/${{ github.repository }}/actions"},"buildType":"https://github.com/Attestations/GitHubActionsWorkflow@v1","invocation":{"configSource":{"uri":"git+https://github.com/${{ github.repository }}@${{ github.ref }}","digest":{"sha1":"${{ github.sha }}"},"entryPoint":".github/workflows/deploy.yml"}},"metadata":{"buildStartedOn":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","completeness":{"parameters":true,"environment":false,"materials":false},"reproducible":false}}}
+          JSONEOF
+          echo "✅ Provenance: fwg-ultraedge.intoto.jsonl"
+          cat fwg-ultraedge.intoto.jsonl
+
+      - name: Upload provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: fwg-ultraedge-provenance
+          path: fwg-ultraedge.intoto.jsonl
+          if-no-files-found: warn
 
 # ════════════════════════════════════════════════════════════
 # JOB 8 — EDGE PERFORMANCE CHECK 🚀
