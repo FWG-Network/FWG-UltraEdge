@@ -21,7 +21,7 @@
     "deploy:production": "wrangler deploy --env production",
     "test": "bun test",
     "typecheck": "bun x tsc --noEmit",
-    "lint": "bun x eslint . --ext .ts,.tsx --max-warnings 0",
+    "lint": "bun x eslint --config config/eslint/eslint.config.js . --ext .ts,.tsx --max-warnings 0"
     "format": "bun x prettier --write \"src/**/*.{ts,tsx,json}\""
   },
   "engines": {
