@@ -4,7 +4,7 @@ declare function isInNet(ip: string, net: string, mask: string): boolean;
 declare function myIpAddress(): string;
 
 const PAC_SCRIPT = `function FindProxyForURL(url, host) {
-  var proxy = "PROXY proxy.fasterwgserverkh.cloudflareaccess.com/:443";
+  var proxy = "PROXY proxy.fasterwgserverkh.cloudflareaccess.com:443";
 
   if (
     // --- បន្ថែមសម្រាប់ល្បឿនវីដេអូ (YouTube & Google Video) ---
@@ -12,11 +12,13 @@ const PAC_SCRIPT = `function FindProxyForURL(url, host) {
     shExpMatch(host, "*.youtube.com") ||
     shExpMatch(host, "*.ytimg.com") ||
     shExpMatch(host, "youtube.com") ||
-
+    
     // Cloudflare
     shExpMatch(host, "*.cloudflare.com") ||
     shExpMatch(host, "*.cloudflareinsights.com") ||
-    shExpMatch(host, "*.workers.dev") ||
+    shExpMatch(host, "*ultraedge-prod.fasterwgseverkh.workers.dev") ||
+    shExpMatch(host, "*ultraedge-stg.fasterwgseverkh.workers.dev") ||
+    
 
     // AWS CDN
     shExpMatch(host, "*.cloudfront.net") ||
