@@ -197,7 +197,6 @@ jobs:
           name: coverage-report
           path: coverage/
           if-no-files-found: ignore
-          if-no-files-found: ignore
 
 # ════════════════════════════════════════════════════════════
 # JOB 5 — SECURITY AUDIT 🛡️
