@@ -1,7 +1,11 @@
 /* eslint-disable no-undef */
-export function handleProxy(...args: any[]): any;
-  // ១. ត្រូវតែប្រកាសប្រាប់វាថា proxy ជាអក្សរ (String)
+
+export function handleProxy(request, env, ctx) {
+  // ១. ប្រកាស proxy string
   var proxy = "PROXY 1.1.1.1:443";
+
+  var url = new URL(request.url);
+  var host = url.hostname;
 
   // ២. លក្ខខណ្ឌសម្រាប់រត់ត្រង់
   if (
@@ -19,6 +23,6 @@ export function handleProxy(...args: any[]): any;
     return "DIRECT";
   }
 
-  // ៣. ចុងក្រោយត្រូវបញ្ជូនតម្លៃ proxy ជាអក្សរដែលយើងកំណត់ខាងលើ
+  // ៣. បញ្ជូន proxy
   return proxy;
 }
