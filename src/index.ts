@@ -639,3 +639,28 @@ export class SmartRouter implements DurableObject {
         } catch (_err) {
           // silent
         }
+
+      this.logs.push(data);
+      if (this.logs.length > 1000) this.logs.shift();
+      await this.state.storage.put("logs", this.logs);
+      return Response.json({ ok: true });
+    }
+
+    // GET — return logs
+    const url = new URL(request.url);
+    const limit = parseInt(url.searchParams.get("limit") ?? "100", 10);
+    const logs = this.logs.slice(-limit);
+    return Response.json({ total: this.logs.length, logs });
+  }
+}
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    try {
+      return await handleRequest(request, env, ctx);
+    } catch (err) {
+      if (err instanceof Error) await sendToSentry(env, err);
+      return new Response("Internal Server Error", { status: 500 });
+    }
+  },
+} satisfies ExportedHandler<Env>;
