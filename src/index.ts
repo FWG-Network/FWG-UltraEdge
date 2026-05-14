@@ -92,7 +92,11 @@ export default Sentry.withSentry(
       }
     },
 
-    async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    async scheduled(
+      controller: ScheduledController,
+      env: Env,
+      ctx: ExecutionContext
+    ): Promise<void> {
       ctx.waitUntil(
         (async () => {
           try {
