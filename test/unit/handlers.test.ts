@@ -4,31 +4,27 @@ import { describe, it, expect, beforeAll } from "bun:test";
 
 // ── Mock Env ──
 const mockEnv = {
-  ENVIRONMENT:        "test",
-  APP_NAME:           "FWG-UltraEdge",
-  APP_VERSION:        "3.0.0",
-  WORKER_VERSION:     "3.0.0",
-  CONFIG_API_URL:     "https://config.example.com",
-  VIDEO_ORIGIN:       "https://video.example.com",
-  RESTREAM_API_KEY:   "test-key",
+  ENVIRONMENT: "test",
+  APP_NAME: "FWG-UltraEdge",
+  APP_VERSION: "3.0.0",
+  WORKER_VERSION: "3.0.0",
+  CONFIG_API_URL: "https://config.example.com",
+  VIDEO_ORIGIN: "https://video.example.com",
+  RESTREAM_API_KEY: "test-key",
   HEALTH_CHECK_TOKEN: "test-token",
-  AUTH_SECRET:        "test-secret",
-  ALLOWED_ORIGINS:    "*",
-  SENTRY_DSN:         "",
-  SLACK_WEBHOOK_URL:  "",
-  RATE_LIMIT_MAX:     "60",
-  RATE_LIMIT_WINDOW:  "60",
-  ULTRA_EDGE_KV:      {} as KVNamespace,
-  ULTRA_EDGE_VIDEOS:  {} as R2Bucket,
-  SMART_ROUTER:       {} as DurableObjectNamespace,
+  AUTH_SECRET: "test-secret",
+  ALLOWED_ORIGINS: "*",
+  SENTRY_DSN: "",
+  SLACK_WEBHOOK_URL: "",
+  RATE_LIMIT_MAX: "60",
+  RATE_LIMIT_WINDOW: "60",
+  ULTRA_EDGE_KV: {} as KVNamespace,
+  ULTRA_EDGE_VIDEOS: {} as R2Bucket,
+  SMART_ROUTER: {} as DurableObjectNamespace,
 };
 
 // ── Helper ──
-function makeRequest(
-  path: string,
-  method = "GET",
-  headers: Record<string, string> = {}
-): Request {
+function makeRequest(path: string, method = "GET", headers: Record<string, string> = {}): Request {
   return new Request(`https://ultraedge.example.com${path}`, {
     method,
     headers,
@@ -44,7 +40,7 @@ describe("CORS", () => {
     const res = new Response(null, {
       status: 204,
       headers: {
-        "Access-Control-Allow-Origin":  "*",
+        "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
       },
     });
@@ -66,10 +62,10 @@ describe("CORS", () => {
 describe("Health Check", () => {
   it("returns status ok", () => {
     const body = {
-      status:      "ok",
-      version:     mockEnv.APP_VERSION,
+      status: "ok",
+      version: mockEnv.APP_VERSION,
       environment: mockEnv.ENVIRONMENT,
-      timestamp:   Date.now(),
+      timestamp: Date.now(),
     };
     expect(body.status).toBe("ok");
     expect(body.version).toBe("3.0.0");
@@ -88,11 +84,11 @@ describe("Health Check", () => {
 // ════════════════════════════════════
 describe("Security Headers", () => {
   const headers = new Headers({
-    "X-Frame-Options":          "SAMEORIGIN",
-    "X-Content-Type-Options":   "nosniff",
-    "X-XSS-Protection":         "1; mode=block",
+    "X-Frame-Options": "SAMEORIGIN",
+    "X-Content-Type-Options": "nosniff",
+    "X-XSS-Protection": "1; mode=block",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-    "Referrer-Policy":          "strict-origin-when-cross-origin",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
   });
 
   it("X-Frame-Options is SAMEORIGIN", () => {
@@ -172,7 +168,7 @@ describe("URL Routing", () => {
 
   it("unknown path returns 404 structure", () => {
     const res = {
-      status:  404,
+      status: 404,
       body: { error: "Not Found", app: "FWG-UltraEdge 🌍⚡" },
     };
     expect(res.status).toBe(404);

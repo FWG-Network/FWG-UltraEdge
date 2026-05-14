@@ -4,10 +4,10 @@ import { describe, it, expect, mock, beforeEach } from "bun:test";
 
 // ── Mock R2 Object ──
 interface MockR2Object {
-  key:      string;
-  body:     ReadableStream;
-  size:     number;
-  etag:     string;
+  key: string;
+  body: ReadableStream;
+  size: number;
+  etag: string;
   httpMetadata?: { contentType?: string };
 }
 
@@ -19,15 +19,17 @@ function createMockR2() {
     get: mock(async (key: string): Promise<MockR2Object | null> => {
       return store[key] ?? null;
     }),
-    put: mock(async (key: string, body: string, opts?: { httpMetadata?: { contentType?: string } }) => {
-      store[key] = {
-        key,
-        body:          new ReadableStream(),
-        size:          body.length,
-        etag:          `etag-${key}`,
-        httpMetadata:  opts?.httpMetadata,
-      };
-    }),
+    put: mock(
+      async (key: string, body: string, opts?: { httpMetadata?: { contentType?: string } }) => {
+        store[key] = {
+          key,
+          body: new ReadableStream(),
+          size: body.length,
+          etag: `etag-${key}`,
+          httpMetadata: opts?.httpMetadata,
+        };
+      }
+    ),
     delete: mock(async (key: string) => {
       delete store[key];
     }),

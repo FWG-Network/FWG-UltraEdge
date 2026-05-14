@@ -3,11 +3,7 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 
 // ── Helper ──
-function makeRequest(
-  path:    string,
-  method = "GET",
-  headers: Record<string, string> = {}
-): Request {
+function makeRequest(path: string, method = "GET", headers: Record<string, string> = {}): Request {
   return new Request(`https://ultraedge.example.com${path}`, {
     method,
     headers,
@@ -27,7 +23,7 @@ const ROUTES = [
 function matchRoute(pathname: string): string | null {
   for (const route of ROUTES) {
     const pattern = route.replace(/:[\w]+/g, "[^/]+");
-    const regex   = new RegExp(`^${pattern}$`);
+    const regex = new RegExp(`^${pattern}$`);
     if (regex.test(pathname)) return route;
   }
   return null;
@@ -75,11 +71,11 @@ describe("Router — Route Matching", () => {
 // ════════════════════════════════════
 describe("Router — CORS Headers", () => {
   const corsHeaders = {
-    "Access-Control-Allow-Origin":   "*",
-    "Access-Control-Allow-Methods":  "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers":  "Content-Type, Authorization, X-Request-ID",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Request-ID",
     "Access-Control-Expose-Headers": "X-Powered-By, X-Environment, X-Response-Time",
-    "Access-Control-Max-Age":        "86400",
+    "Access-Control-Max-Age": "86400",
   };
 
   it("Allow-Origin is *", () => {
@@ -168,10 +164,10 @@ describe("Router — URL Parsing", () => {
 describe("Router — Response Structure", () => {
   it("health response has correct structure", () => {
     const body = {
-      status:      "ok",
-      version:     "3.0.0",
+      status: "ok",
+      version: "3.0.0",
       environment: "test",
-      timestamp:   Date.now(),
+      timestamp: Date.now(),
     };
     expect(body.status).toBe("ok");
     expect(body.version).toBe("3.0.0");
@@ -181,8 +177,8 @@ describe("Router — Response Structure", () => {
 
   it("error response has correct structure", () => {
     const body = {
-      error:     "Not Found",
-      app:       "FWG-UltraEdge 🌍⚡",
+      error: "Not Found",
+      app: "FWG-UltraEdge 🌍⚡",
       timestamp: new Date().toISOString(),
     };
     expect(body.error).toBe("Not Found");

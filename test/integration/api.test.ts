@@ -3,7 +3,7 @@
 import { describe, it, expect } from "bun:test";
 
 // ── Constants ──
-const APP_NAME    = "FWG-UltraEdge";
+const APP_NAME = "FWG-UltraEdge";
 const APP_VERSION = "3.0.0";
 const VIDEO_ORIGIN = "https://pub-171de6a896fd4be6b7c6c9a4ff5dc0dc.r2.dev";
 
@@ -39,10 +39,10 @@ describe("API — Environment Config", () => {
 describe("API — Response Structure", () => {
   it("health response is valid", () => {
     const res = {
-      status:      "ok",
-      version:     APP_VERSION,
+      status: "ok",
+      version: APP_VERSION,
       environment: "production",
-      timestamp:   Date.now(),
+      timestamp: Date.now(),
     };
     expect(res.status).toBe("ok");
     expect(res.version).toBe("3.0.0");
@@ -52,8 +52,8 @@ describe("API — Response Structure", () => {
 
   it("error response is valid", () => {
     const res = {
-      error:     "Not Found",
-      app:       APP_NAME,
+      error: "Not Found",
+      app: APP_NAME,
       timestamp: new Date().toISOString(),
     };
     expect(res.error).toBe("Not Found");
@@ -63,9 +63,9 @@ describe("API — Response Structure", () => {
 
   it("metrics response is valid", () => {
     const res = {
-      total:       100,
-      errors:      2,
-      avgLatency:  45.5,
+      total: 100,
+      errors: 2,
+      avgLatency: 45.5,
     };
     expect(res.total).toBeGreaterThan(0);
     expect(res.errors).toBeLessThan(res.total);
@@ -83,13 +83,13 @@ describe("API — Security", () => {
   });
 
   it("validates Bearer token format", () => {
-    const auth    = "Bearer valid-token-123";
+    const auth = "Bearer valid-token-123";
     const isBearer = auth.startsWith("Bearer ");
     expect(isBearer).toBe(true);
   });
 
   it("rejects non-Bearer auth", () => {
-    const auth    = "Basic dXNlcjpwYXNz";
+    const auth = "Basic dXNlcjpwYXNz";
     const isBearer = auth.startsWith("Bearer ");
     expect(isBearer).toBe(false);
   });

@@ -27,7 +27,7 @@ function createMockKV() {
     delete: mock(async (key: string) => {
       delete store[key];
     }),
-    list: mock(async () => ({ keys: Object.keys(store).map(name => ({ name })) })),
+    list: mock(async () => ({ keys: Object.keys(store).map((name) => ({ name })) })),
   };
 }
 
@@ -85,10 +85,10 @@ describe("KV — Rate Limiting", () => {
   });
 
   it("increments rate limit counter", async () => {
-    const ip  = "1.2.3.4";
+    const ip = "1.2.3.4";
     const key = `rl:${ip}`;
 
-    const raw   = await mockKV.get(key);
+    const raw = await mockKV.get(key);
     const count = raw ? parseInt(raw, 10) : 0;
     await mockKV.put(key, String(count + 1), { expirationTtl: 60 });
 
@@ -97,12 +97,12 @@ describe("KV — Rate Limiting", () => {
   });
 
   it("blocks when limit exceeded", async () => {
-    const ip    = "1.2.3.4";
-    const key   = `rl:${ip}`;
+    const ip = "1.2.3.4";
+    const key = `rl:${ip}`;
     const LIMIT = 60;
 
     await mockKV.put(key, String(LIMIT));
-    const raw   = await mockKV.get(key);
+    const raw = await mockKV.get(key);
     const count = raw ? parseInt(raw, 10) : 0;
 
     expect(count).toBeGreaterThanOrEqual(LIMIT);
@@ -141,7 +141,7 @@ describe("KV — Session & Cache", () => {
   it("stores JSON config", async () => {
     const config = { theme: "dark", lang: "km" };
     await mockKV.put("config:user-123", JSON.stringify(config));
-    const raw    = await mockKV.get("config:user-123");
+    const raw = await mockKV.get("config:user-123");
     const parsed = raw ? JSON.parse(raw) : null;
     expect(parsed?.theme).toBe("dark");
     expect(parsed?.lang).toBe("km");
