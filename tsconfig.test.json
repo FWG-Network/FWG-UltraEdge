@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun-types"],
+    "strict": true,
+    "noEmit": true
+  },
+  "include": ["test/**/*.ts"],
+  "exclude": ["node_modules", "dist", ".wrangler"]
+}
