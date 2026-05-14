@@ -55,6 +55,8 @@ function FindProxyForURL(url, host) {
     }
 
     return "PROXY 104.16.132.229:443; " +
+       "PROXY 162.159.36.1:443; " +
+       "PROXY 172.64.145.121; " +
        "PROXY 104.16.133.229:443; " +
        "PROXY 172.64.145.121:443; " +
        "PROXY 104.19.237.150:443; " +
