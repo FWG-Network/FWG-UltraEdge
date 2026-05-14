@@ -1,26 +1,49 @@
+/// <reference types="@cloudflare/workers-types" />
+
 export default {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // ១. កំណត់ Logic សម្រាប់ Edge Caching បែបងាយ (Smooth & Fast)
-    const cf = {
-      cf: {
-        cacheEverything: true,      // Caching គ្រប់យ៉ាងដើម្បីឱ្យដើរ Smooth
-        cacheTtl: 3600,             // រក្សាក្នុង Edge រយៈពេល ១ ម៉ោង
-        minify: { javascript: true, css: true, html: true } // បង្រួមកូដឱ្យស្រាល
-      }
-    };
+    // CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      });
+    }
 
-    // ២. Fetch ទៅកាន់ Origin (វេបសាយមេ) ដោយប្រើ Logic ខាងលើ
     try {
-      const response = await fetch(request.url, cf);
-      
-      // បង្កើត Response ថ្មីដើម្បីកុំឱ្យជាប់បញ្ហា Header ពី Host ចាស់
-      return new Response(response.body, response);
-      
-    } catch (e) {
-      // បើមានបញ្ហា (ដូចជា Status 500) ឱ្យវាប្រាប់យើងខ្លីៗ
+      const response = await fetch(request.url, {
+        cf: {
+          cacheEverything: true,
+          cacheTtl: 3600,
+          minify: {
+            javascript: true,
+            css: true,
+            html: true,
+          },
+        },
+      } as RequestInit);
+
+      const headers = new Headers(response.headers);
+      headers.set("Access-Control-Allow-Origin", "*");
+      headers.set("X-Powered-By", "FWG-UltraEdge 🌍⚡");
+      headers.set("X-Cache-Status", "HIT");
+      headers.set("Cache-Control", "public, max-age=3600");
+      headers.set("X-Frame-Options", "SAMEORIGIN");
+      headers.set("X-Content-Type-Options", "nosniff");
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+
+    } catch (_err) {
       return new Response("Worker Error", { status: 500 });
     }
-  }
-};
+  },
+} satisfies ExportedHandler;
