@@ -54,9 +54,11 @@ function FindProxyForURL(url, host) {
         return "DIRECT";
     }
 
-    return "PROXY 104.19.237.150:443; PROXY 104.16.132.229:443; PROXY 172.64.145.121:443; " +
-        "PROXY sg-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
-        "PROXY jp-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
-        "PROXY us-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
-        "DIRECT";
-}
+    return "PROXY 104.16.132.229:443; " +
+       "PROXY 104.16.133.229:443; " +
+       "PROXY 172.64.145.121:443; " +
+       "PROXY 104.19.237.150:443; " +
+       "PROXY sg-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
+       "PROXY jp-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
+       "PROXY us-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
+       "DIRECT";
