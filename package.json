@@ -5,9 +5,9 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260511.1",
     "@eslint/js": "^10.0.1",
-    "@typescript-eslint/eslint-plugin": "^8.59.2",
-    "@typescript-eslint/parser": "^8.59.2",
-    "bun-types": "^1.3.13",
+    "@typescript-eslint/eslint-plugin": "^8.59.3",
+    "@typescript-eslint/parser": "^8.59.3",
+    "bun-types": "^1.3.14",
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
     "typescript": "^6.0.3"
@@ -22,7 +22,7 @@
     "test": "bun test",
     "typecheck": "bun x tsc --noEmit",
     "lint": "bun x eslint . --ext .ts,.tsx --max-warnings 0",
-  "format": "bun x prettier --write \"src/**/*.{ts,tsx,json}\""
+    "format": "bun x prettier --write \"src/**/*.{ts,tsx,json}\""
   },
   "engines": {
     "node": ">=24.0.0",
