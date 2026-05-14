@@ -1,8 +1,9 @@
 // FWG-UltraEdge 🌍⚡ — Health Handler Tests
 // Version: 3.0.0 | Comprehensive Health Tests
+/// <reference types="bun-types" />
+
 import { describe, it, expect } from "bun:test";
 import type { Env } from "../../src/types/env";
-
 // ── Mock Env ──
 const mockEnv: Partial<Env> = {
   ENVIRONMENT: "test",
