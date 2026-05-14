@@ -634,6 +634,8 @@ export class SmartRouter implements DurableObject {
 
     if (request.method === "POST") {
       let data: unknown;
-      try { data = await request.json(); }
-      catch (_err) {  },
-} satisfies ExportedHandler<Env>;
+      try {
+          data = await request.json();
+        } catch (_err) {
+          // silent
+        }
