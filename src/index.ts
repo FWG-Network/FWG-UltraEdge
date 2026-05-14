@@ -7,17 +7,17 @@
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
 export interface Env {
-  VIDEO_ORIGIN:       string;
-  SMART_ROUTER:       DurableObjectNamespace;
-  CLICKHOUSE_INGEST:  string;
-  CLICKHOUSE_URL:     string;
-  CLICKHOUSE_USER:    string;
-  CLICKHOUSE_PASS:    string;
-  SENTRY_DSN:         string;
-  KV:                 KVNamespace;
-  R2:                 R2Bucket;
-  CIRCUIT:            DurableObjectNamespace;
-  CONFIG_API_URL:     string;
+  VIDEO_ORIGIN: string;
+  SMART_ROUTER: DurableObjectNamespace;
+  CLICKHOUSE_INGEST: string;
+  CLICKHOUSE_URL: string;
+  CLICKHOUSE_USER: string;
+  CLICKHOUSE_PASS: string;
+  SENTRY_DSN: string;
+  KV: KVNamespace;
+  R2: R2Bucket;
+  CIRCUIT: DurableObjectNamespace;
+  CONFIG_API_URL: string;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,27 +25,27 @@ export interface Env {
 type BlockReason = "blocked_host" | "blocked_ua" | "rate_limited" | "ok";
 
 interface MetricsPayload {
-  url:          string;
-  method:       string;
-  status:       number;
-  latency:      number;
-  cached?:      boolean;
+  url: string;
+  method: string;
+  status: number;
+  latency: number;
+  cached?: boolean;
   contentType?: string;
-  userAgent?:   string;
-  reason?:      BlockReason;
-  ip?:          string;
-  timestamp:    number;
-  origin?:      string;
-  country?:     string;
-  colo?:        string;
+  userAgent?: string;
+  reason?: BlockReason;
+  ip?: string;
+  timestamp: number;
+  origin?: string;
+  country?: string;
+  colo?: string;
 }
 
 interface ClickHousePayload {
   latency: number;
-  status:  number;
+  status: number;
   region?: string;
-  route?:  string;
-  colo?:   string;
+  route?: string;
+  colo?: string;
 }
 
 // ─── PAC File ─────────────────────────────────────────────────────────────────
@@ -90,9 +90,12 @@ function FindProxyForURL(url, host) {
 const WORKER_VERSION = "2.1.0";
 
 const BLOCKED_HOSTS_SET = new Set([
-  "doubleclick.net", "googlesyndication.com",
-  "adservice.google.com", "googletagmanager.com",
-  "adnxs.com", "moatads.com",
+  "doubleclick.net",
+  "googlesyndication.com",
+  "adservice.google.com",
+  "googletagmanager.com",
+  "adnxs.com",
+  "moatads.com",
 ]);
 
 // ✅ FIX v2.1.0: "curl" and "wget" removed from production block list.
@@ -109,8 +112,13 @@ const BLOCKED_HOSTS_SET = new Set([
 // or Bot Management layer rather than UA string matching, which is trivially
 // bypassed by any real attacker anyway.
 const BLOCKED_UA_SET = new Set([
-  "python", "scrapy",
-  "httpclient", "bot", "spider", "crawler", "scan",
+  "python",
+  "scrapy",
+  "httpclient",
+  "bot",
+  "spider",
+  "crawler",
+  "scan",
 ]);
 
 // ✅ Trusted CI User-Agents — always bypass UA block
@@ -121,30 +129,29 @@ const CI_UA_PREFIXES = [
   "github-actions-benchmark",
 ];
 
-const RATE_LIMIT       = 60;
-const RATE_WINDOW_SEC  = 60;
+const RATE_LIMIT = 60;
+const RATE_WINDOW_SEC = 60;
 
 // ─── Security Headers ─────────────────────────────────────────────────────────
 
 const SECURITY_HEADERS: Record<string, string> = {
-  "x-frame-options":              "SAMEORIGIN",
-  "x-content-type-options":       "nosniff",
-  "x-xss-protection":             "1; mode=block",
-  "referrer-policy":              "strict-origin-when-cross-origin",
-  "strict-transport-security":    "max-age=31536000; includeSubDomains; preload",
-  "permissions-policy":           "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-  "access-control-allow-origin":  "*",
+  "x-frame-options": "SAMEORIGIN",
+  "x-content-type-options": "nosniff",
+  "x-xss-protection": "1; mode=block",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "access-control-allow-origin": "*",
 };
 
-function applySecurityHeaders(
-  resp:  Response,
-  extra?: Record<string, string>,
-): Response {
+function applySecurityHeaders(resp: Response, extra?: Record<string, string>): Response {
   const h = new Headers(resp.headers);
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) h.set(k, v);
-  if (extra) for (const [k, v] of Object.entries(extra))   h.set(k, v);
+  if (extra) for (const [k, v] of Object.entries(extra)) h.set(k, v);
   return new Response(resp.body, {
-    status: resp.status, statusText: resp.statusText, headers: h,
+    status: resp.status,
+    statusText: resp.statusText,
+    headers: h,
   });
 }
 
@@ -181,8 +188,8 @@ function isBlockedUA(ua: string): boolean {
 }
 
 async function checkRateLimit(kv: KVNamespace, ip: string): Promise<boolean> {
-  const key   = `rl:${ip}`;
-  const raw   = await kv.get(key);
+  const key = `rl:${ip}`;
+  const raw = await kv.get(key);
   const count = raw ? parseInt(raw, 10) : 0;
   if (count >= RATE_LIMIT) return true;
   await kv.put(key, String(count + 1), { expirationTtl: RATE_WINDOW_SEC });
@@ -198,17 +205,20 @@ async function sendToClickHouse(env: Env, data: ClickHousePayload): Promise<void
     await fetch(env.CLICKHOUSE_URL, {
       method: "POST",
       headers: {
-        "Authorization": "Basic " + btoa(`${env.CLICKHOUSE_USER}:${env.CLICKHOUSE_PASS}`),
-        "Content-Type":  "application/json",
+        Authorization: "Basic " + btoa(`${env.CLICKHOUSE_USER}:${env.CLICKHOUSE_PASS}`),
+        "Content-Type": "application/json",
       },
-      body: query + "\n" + JSON.stringify({
-        timestamp: new Date().toISOString(),
-        latency:   data.latency,
-        status:    data.status,
-        region:    data.region  ?? "",
-        route:     data.route   ?? "",
-        colo:      data.colo    ?? "",
-      }),
+      body:
+        query +
+        "\n" +
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          latency: data.latency,
+          status: data.status,
+          region: data.region ?? "",
+          route: data.route ?? "",
+          colo: data.colo ?? "",
+        }),
     });
   } catch (e) {
     console.error("[ClickHouse] error:", e);
@@ -224,8 +234,8 @@ async function sendToSentry(env: Env, error: Error): Promise<void> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message:   error.message,
-        stack:     error.stack,
+        message: error.message,
+        stack: error.stack,
         timestamp: Date.now(),
       }),
     });
@@ -244,25 +254,31 @@ async function logMetrics(env: Env, data: MetricsPayload): Promise<void> {
   const tasks: Promise<void>[] = [];
 
   if (env.SMART_ROUTER) {
-    tasks.push((async () => {
-      try {
-        const id   = env.SMART_ROUTER.idFromName("global");
-        const stub = env.SMART_ROUTER.get(id);
-        await stub.fetch("https://internal/log", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(data),
-        });
-      } catch (e) { console.error("[SmartRouter] error:", e); }
-    })());
+    tasks.push(
+      (async () => {
+        try {
+          const id = env.SMART_ROUTER.idFromName("global");
+          const stub = env.SMART_ROUTER.get(id);
+          await stub.fetch("https://internal/log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+        } catch (e) {
+          console.error("[SmartRouter] error:", e);
+        }
+      })()
+    );
   }
 
   if (env.CLICKHOUSE_URL) {
-    tasks.push(sendToClickHouse(env, {
-      latency: data.latency,
-      status:  data.status,
-      colo:    data.colo,
-    }));
+    tasks.push(
+      sendToClickHouse(env, {
+        latency: data.latency,
+        status: data.status,
+        colo: data.colo,
+      })
+    );
   }
 
   await Promise.allSettled(tasks);
@@ -272,14 +288,14 @@ async function logMetrics(env: Env, data: MetricsPayload): Promise<void> {
 
 async function prometheusMetrics(env: Env): Promise<Response> {
   try {
-    const id   = env.SMART_ROUTER.idFromName("global");
+    const id = env.SMART_ROUTER.idFromName("global");
     const stub = env.SMART_ROUTER.get(id);
-    const res  = await stub.fetch("https://internal/?limit=1000");
-    const json = await res.json() as { total: number; logs: any[] };
+    const res = await stub.fetch("https://internal/?limit=1000");
+    const json = (await res.json()) as { total: number; logs: any[] };
 
-    const total      = json.total ?? 0;
-    const logs       = json.logs  ?? [];
-    const errors     = logs.filter((l: any) => l.status >= 500).length;
+    const total = json.total ?? 0;
+    const logs = json.logs ?? [];
+    const errors = logs.filter((l: any) => l.status >= 500).length;
     const avgLatency = logs.length
       ? logs.reduce((a: number, b: any) => a + (b.latency ?? 0), 0) / logs.length
       : 0;
@@ -308,44 +324,41 @@ avg_latency_ms ${avgLatency.toFixed(2)}
 
 interface Origin {
   name: string;
-  url:  string;
+  url: string;
 }
 
 interface OriginResult {
-  ok:        boolean;
-  status?:   number;
-  latency:   number;
-  origin:    string;
+  ok: boolean;
+  status?: number;
+  latency: number;
+  origin: string;
   response?: Response;
 }
 
 function smartRoute(request: Request, env: Env): Origin[] {
-  const cf      = (request as any).cf ?? {};
+  const cf = (request as any).cf ?? {};
   const country = cf.country ?? "unknown";
 
   const routes: Origin[] = [
     { name: "primary-us", url: env.VIDEO_ORIGIN },
-    { name: "asia-edge",  url: "https://asia-origin.example.com" },
-    { name: "eu-edge",    url: "https://eu-origin.example.com" },
+    { name: "asia-edge", url: "https://asia-origin.example.com" },
+    { name: "eu-edge", url: "https://eu-origin.example.com" },
   ];
 
   if (country === "KH" || country === "TH") return [routes[1], routes[0]];
-  if (country === "US")                      return [routes[0], routes[1]];
+  if (country === "US") return [routes[0], routes[1]];
   return routes;
 }
 
-async function raceOrigins(
-  origins: Origin[],
-  timeout = 2000,
-): Promise<OriginResult | null> {
+async function raceOrigins(origins: Origin[], timeout = 2000): Promise<OriginResult | null> {
   const controller = new AbortController();
-  const timer      = setTimeout(() => controller.abort(), timeout);
+  const timer = setTimeout(() => controller.abort(), timeout);
 
   try {
     const requests = origins.map(async (origin): Promise<OriginResult> => {
       const start = Date.now();
       try {
-        const res     = await fetch(origin.url, { signal: controller.signal });
+        const res = await fetch(origin.url, { signal: controller.signal });
         const latency = Date.now() - start;
         return { ok: res.ok, status: res.status, latency, origin: origin.name, response: res };
       } catch (_err) {
@@ -357,10 +370,7 @@ async function raceOrigins(
     clearTimeout(timer);
 
     // Pick fastest healthy origin
-    return results
-      .filter(r => r.ok)
-      .sort((a, b) => a.latency - b.latency)[0] ?? null;
-
+    return results.filter((r) => r.ok).sort((a, b) => a.latency - b.latency)[0] ?? null;
   } catch (_err) {
     return null;
   }
@@ -368,24 +378,26 @@ async function raceOrigins(
 
 // ─── Core Handler ─────────────────────────────────────────────────────────────
 
-async function handleRequest(
-  request: Request,
-  env:     Env,
-  ctx:     ExecutionContext,
-): Promise<Response> {
-  const start    = Date.now();
-  const url      = new URL(request.url);
+async function handleRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const start = Date.now();
+  const url = new URL(request.url);
   const hostname = url.hostname;
-  const ip       = request.headers.get("cf-connecting-ip") ?? "0.0.0.0";
-  const ua       = request.headers.get("user-agent") ?? "";
-  const cf       = (request as any).cf ?? {};
+  const ip = request.headers.get("cf-connecting-ip") ?? "0.0.0.0";
+  const ua = request.headers.get("user-agent") ?? "";
+  const cf = (request as any).cf ?? {};
 
   const metric = (status: number, reason: BlockReason, cached = false) =>
     sendMetrics(env, ctx, {
-      url: request.url, method: request.method,
-      status, latency: Date.now() - start,
-      cached, reason, ip, userAgent: ua,
-      country: cf.country, colo: cf.colo,
+      url: request.url,
+      method: request.method,
+      status,
+      latency: Date.now() - start,
+      cached,
+      reason,
+      ip,
+      userAgent: ua,
+      country: cf.country,
+      colo: cf.colo,
       timestamp: Date.now(),
     });
 
@@ -393,7 +405,7 @@ async function handleRequest(
   if (request.method === "OPTIONS") {
     return new Response(null, {
       headers: {
-        "Access-Control-Allow-Origin":  "*",
+        "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
       },
@@ -405,17 +417,20 @@ async function handleRequest(
   // It is used by CI/CD pipelines, uptime monitors, and load balancers.
   // Must always return HTTP 200 to confirm the worker is alive.
   if (url.pathname === "/health") {
-    return Response.json({
-      status:    "ok",
-      timestamp: Date.now(),
-      version:   WORKER_VERSION,
-      colo:      cf.colo ?? "unknown",
-    }, {
-      headers: {
-        "Cache-Control": "no-store, no-cache",
-        "X-Worker-Version": WORKER_VERSION,
+    return Response.json(
+      {
+        status: "ok",
+        timestamp: Date.now(),
+        version: WORKER_VERSION,
+        colo: cf.colo ?? "unknown",
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache",
+          "X-Worker-Version": WORKER_VERSION,
+        },
+      }
+    );
   }
 
   // ── /metrics (Prometheus) ───────────────────────────────────────────────────
@@ -427,10 +442,10 @@ async function handleRequest(
   if (url.pathname === "/pac") {
     return new Response(PAC, {
       headers: {
-        "Content-Type":              "application/x-ns-proxy-autoconfig",
-        "Cache-Control":             "public, max-age=300",
+        "Content-Type": "application/x-ns-proxy-autoconfig",
+        "Cache-Control": "public, max-age=300",
         "Access-Control-Allow-Origin": "*",
-        "X-Content-Type-Options":    "nosniff",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   }
@@ -460,7 +475,7 @@ async function handleRequest(
 
   // ── GET — Cache + Proxy ─────────────────────────────────────────────────────
   if (request.method === "GET") {
-    const cache    = (caches as any).default as Cache;
+    const cache = (caches as any).default as Cache;
     const cacheKey = new Request(request.url, request);
 
     const cached = await cache.match(cacheKey);
@@ -473,7 +488,7 @@ async function handleRequest(
     try {
       origin = await fetch(request, {
         cf: {
-          cacheTtl:       1800,
+          cacheTtl: 1800,
           cacheEverything: true,
           minify: { javascript: true, css: true, html: true },
         },
@@ -492,12 +507,12 @@ async function handleRequest(
       return applySecurityHeaders(origin, { "X-Cache-Status": "MISS" });
     }
 
-    const isVideo = contentType.includes("video") ||
-      /\.(mp4|webm|m3u8|ts|mkv|avi)$/i.test(url.pathname);
-    const maxAge  = isVideo ? 31_536_000 : 1_800;
+    const isVideo =
+      contentType.includes("video") || /\.(mp4|webm|m3u8|ts|mkv|avi)$/i.test(url.pathname);
+    const maxAge = isVideo ? 31_536_000 : 1_800;
 
     const resp = applySecurityHeaders(origin, {
-      "Cache-Control":  `public, max-age=${maxAge}`,
+      "Cache-Control": `public, max-age=${maxAge}`,
       "X-Cache-Status": "MISS",
     });
 
@@ -505,10 +520,17 @@ async function handleRequest(
       Promise.allSettled([
         cache.put(cacheKey, resp.clone()),
         logMetrics(env, {
-          url: request.url, method: request.method,
-          status: resp.status, latency: Date.now() - start,
-          cached: false, contentType, reason: "ok",
-          ip, userAgent: ua, colo: cf.colo, timestamp: Date.now(),
+          url: request.url,
+          method: request.method,
+          status: resp.status,
+          latency: Date.now() - start,
+          cached: false,
+          contentType,
+          reason: "ok",
+          ip,
+          userAgent: ua,
+          colo: cf.colo,
+          timestamp: Date.now(),
         }),
       ])
     );
@@ -519,7 +541,7 @@ async function handleRequest(
   // ── POST / PUT / DELETE passthrough ─────────────────────────────────────────
   try {
     const fallback = await fetch(request);
-    const resp     = applySecurityHeaders(fallback);
+    const resp = applySecurityHeaders(fallback);
     metric(resp.status, "ok", false);
     return resp;
   } catch (_err) {
@@ -533,15 +555,17 @@ export class CircuitBreaker implements DurableObject {
   private st: DurableObjectState;
 
   static FAILURE_THRESHOLD = 5;
-  static RECOVERY_TIMEOUT  = 30_000;
-  static HALF_OPEN_PROBES  = 2;
+  static RECOVERY_TIMEOUT = 30_000;
+  static HALF_OPEN_PROBES = 2;
 
-  constructor(state: DurableObjectState) { this.st = state; }
+  constructor(state: DurableObjectState) {
+    this.st = state;
+  }
 
   async fetch(request: Request): Promise<Response> {
     const { pathname } = new URL(request.url);
 
-    if (pathname === "/status")         return Response.json(await this.getState());
+    if (pathname === "/status") return Response.json(await this.getState());
     if (pathname === "/record-failure") return Response.json(await this.recordFailure());
     if (pathname === "/record-success") return Response.json(await this.recordSuccess());
     if (pathname === "/open") {
@@ -561,37 +585,37 @@ export class CircuitBreaker implements DurableObject {
       this.st.storage.get<number>("successes"),
     ]);
     return {
-      state:       state       ?? "CLOSED",
-      failures:    failures    ?? 0,
+      state: state ?? "CLOSED",
+      failures: failures ?? 0,
       lastFailure: lastFailure ?? 0,
-      successes:   successes   ?? 0,
+      successes: successes ?? 0,
     };
   }
 
   private async resetState() {
     await Promise.all([
-      this.st.storage.put("state",       "CLOSED"),
-      this.st.storage.put("failures",    0),
-      this.st.storage.put("successes",   0),
+      this.st.storage.put("state", "CLOSED"),
+      this.st.storage.put("failures", 0),
+      this.st.storage.put("successes", 0),
       this.st.storage.put("lastFailure", 0),
     ]);
     return this.getState();
   }
 
   private async recordFailure() {
-    const s   = await this.getState();
+    const s = await this.getState();
     const now = Date.now();
 
     if (s.state === "OPEN") {
       if (now - s.lastFailure > CircuitBreaker.RECOVERY_TIMEOUT) {
-        await this.st.storage.put("state",     "HALF_OPEN");
+        await this.st.storage.put("state", "HALF_OPEN");
         await this.st.storage.put("successes", 0);
       }
       return this.getState();
     }
 
     const failures = s.failures + 1;
-    await this.st.storage.put("failures",    failures);
+    await this.st.storage.put("failures", failures);
     await this.st.storage.put("lastFailure", now);
     if (failures >= CircuitBreaker.FAILURE_THRESHOLD) {
       await this.st.storage.put("state", "OPEN");
@@ -616,7 +640,9 @@ export class SmartRouter implements DurableObject {
   private state: DurableObjectState;
   private logs: any[] = [];
 
-  constructor(state: DurableObjectState) { this.state = state; }
+  constructor(state: DurableObjectState) {
+    this.state = state;
+  }
 
   async fetch(request: Request): Promise<Response> {
     if (this.logs.length === 0) {
@@ -626,7 +652,7 @@ export class SmartRouter implements DurableObject {
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
-          "Access-Control-Allow-Origin":  "*",
+          "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET, POST, DELETE",
         },
       });
@@ -635,10 +661,10 @@ export class SmartRouter implements DurableObject {
     if (request.method === "POST") {
       let data: unknown;
       try {
-          data = await request.json();
-        } catch (_err) {
-          // silent
-        }
+        data = await request.json();
+      } catch (_err) {
+        // silent
+      }
 
       this.logs.push(data);
       if (this.logs.length > 1000) this.logs.shift();
