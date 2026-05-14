@@ -64,3 +64,4 @@ function FindProxyForURL(url, host) {
        "PROXY jp-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
        "PROXY us-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
        "DIRECT";
+     }
