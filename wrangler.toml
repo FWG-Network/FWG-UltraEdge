@@ -2,7 +2,7 @@
 # FWG-UltraEdge 🌍⚡ — Wrangler Configuration
 # Advanced Observability | Global Optimization | SLSA Ready
 # Durable Objects | KV | R2 | Smart Placement
-# ============================================================
+# ===========================================================
 
 name = "ultraedge-prod"
 main = "src/index.ts"
