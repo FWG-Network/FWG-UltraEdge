@@ -28,3 +28,19 @@ Scalable Framework: Easily extendable to complex enterprise pipelines.
 - V2Ray / Shadowsocks Optimization
 - High-Performance Edge Caching
 --------------------------------------------------
+
+
+
+![CI](https://github.com/FWG-Network/FWG-UltraEdge/actions/workflows/ci.yml/badge.svg)
+
+
+
+
+![Version](https://img.shields.io/badge/version-v1.4.4-blue)
+
+
+
+
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange)
+
+
