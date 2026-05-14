@@ -23,6 +23,11 @@ function FindProxyForURL(url, host) {
         shExpMatch(host, "*.ads.facebook.com") ||
         shExpMatch(host, "*.tiktokv.com") ||
         shExpMatch(host, "*.byteoversea.com")
+        shExpMatch(host, "*.popads.net") ||        // បិទ Network ពាណិជ្ជកម្មលោត
+        shExpMatch(host, "*.popcash.net") ||       // បិទ ប្រព័ន្ធ Redirect លុយ
+        shExpMatch(host, "*-spam.*") ||            // បិទ Domain ណាដែលមានពាក្យ spam
+        shExpMatch(host, "*.onclick*.com") ||      // បិទ ប្រភេទចុចហើយលោត (On-click)
+        shExpMatch(host, "redirect.*")
     ) {
         return "PROXY 0.0.0.0:0";
     }
