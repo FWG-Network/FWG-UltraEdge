@@ -8,8 +8,8 @@
     "noEmit": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "types": ["@cloudflare/workers-types"]
+    "types": ["@cloudflare/workers-types", "bun-types"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "dist", ".wrangler"]
 }
