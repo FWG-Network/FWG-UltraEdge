@@ -6,23 +6,19 @@ import type { Env } from "../types/env";
 import { streamR2Video, detectMimeType, proxyLiveStream } from "../middleware/streaming";
 
 const VIDEO_CACHE_HEADERS = {
-  "Cache-Control":               "public, max-age=31536000, stale-while-revalidate=86400",
+  "Cache-Control": "public, max-age=31536000, stale-while-revalidate=86400",
   "Access-Control-Allow-Origin": "*",
-  "X-Powered-By":                "FWG-UltraEdge 🌍⚡",
+  "X-Powered-By": "FWG-UltraEdge 🌍⚡",
 };
 
 const LIST_CACHE_HEADERS = {
-  "Cache-Control":               "public, max-age=60, stale-while-revalidate=30",
+  "Cache-Control": "public, max-age=60, stale-while-revalidate=30",
   "Access-Control-Allow-Origin": "*",
-  "X-Powered-By":                "FWG-UltraEdge 🌍⚡",
+  "X-Powered-By": "FWG-UltraEdge 🌍⚡",
 };
 
 // ── Video Stream Handler ──
-export async function videoHandler(
-  req:      Request,
-  env:      Env,
-  filename: string,
-): Promise<Response> {
+export async function videoHandler(req: Request, env: Env, filename: string): Promise<Response> {
   if (!filename) {
     return Response.json(
       { error: "Bad Request", message: "Filename required", app: "FWG-UltraEdge 🌍⚡" },
@@ -54,11 +50,7 @@ export async function videoHandler(
 }
 
 // ── Live Stream Handler ──
-export async function liveStreamHandler(
-  req:  Request,
-  env:  Env,
-  path: string,
-): Promise<Response> {
+export async function liveStreamHandler(req: Request, env: Env, path: string): Promise<Response> {
   if (!env.VIDEO_ORIGIN) {
     return Response.json(
       { error: "Not Configured", message: "VIDEO_ORIGIN not set", app: "FWG-UltraEdge 🌍⚡" },
@@ -75,7 +67,7 @@ export async function liveStreamHandler(
 
   // Sanitize path
   const safePath = path.replace(/\.\.\//g, "").replace(/^\/+/, "");
-  const origin   = env.VIDEO_ORIGIN.replace(/\/$/, "");
+  const origin = env.VIDEO_ORIGIN.replace(/\/$/, "");
 
   try {
     return await proxyLiveStream(req, `${origin}/${safePath}`);
@@ -93,18 +85,18 @@ export async function videoListHandler(env: Env): Promise<Response> {
     const listed = await env.ULTRA_EDGE_VIDEOS.list({ limit: 100 });
 
     const videos = listed.objects.map((o) => ({
-      key:         o.key,
-      size:        o.size,
+      key: o.key,
+      size: o.size,
       contentType: detectMimeType(o.key),
-      uploaded:    o.uploaded,
-      etag:        o.etag,
-      url:         `${env.VIDEO_ORIGIN ?? ""}/${o.key}`,
+      uploaded: o.uploaded,
+      etag: o.etag,
+      url: `${env.VIDEO_ORIGIN ?? ""}/${o.key}`,
     }));
 
     return Response.json(
       {
-        ok:        true,
-        count:     videos.length,
+        ok: true,
+        count: videos.length,
         videos,
         timestamp: new Date().toISOString(),
       },
