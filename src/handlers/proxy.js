@@ -46,11 +46,3 @@ export function handleProxy(request, env, ctx) {
         "PROXY 1.0.0.1:443; "           +
         "DIRECT",
         {
-            status: 200,
-            headers: {
-                "Content-Type":                "application/x-ns-proxy-autoconfig",
-                "Cache-Control":               "public, max-age=300",
-                "Access-Control-Allow-Origin": "*",
-            },
-        }
-    );
