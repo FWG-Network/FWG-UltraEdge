@@ -4,8 +4,7 @@ export function handleProxy(request, env, ctx) {
     "PROXY 1.1.1.1:443; " +
     "PROXY 1.0.0.1:443; " +
     "PROXY 127.0.0.1:443; " +    
-    "DIRECT";
-
+    
   const url = new URL(request.url);
   const host = url.hostname;
 
