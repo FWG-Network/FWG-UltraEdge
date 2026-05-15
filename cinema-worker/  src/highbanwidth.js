@@ -21,7 +21,7 @@ function FindProxyForURL(url, host) {
         shExpMatch(host, "172.2*.*") ||
         shExpMatch(host, "172.30.*") ||
         shExpMatch(host, "172.31.*") ||
-        isInNet(ip, "127.0.0.0", "255.0.0.0") ||
+        isInNet(ip, "127.0.0.1", "255.0.0.0") ||
         isInNet(ip, "10.0.0.0", "255.0.0.0") ||
         isInNet(ip, "172.16.0.0", "255.240.0.0") ||
         isInNet(ip, "192.168.0.0", "255.255.0.0")
