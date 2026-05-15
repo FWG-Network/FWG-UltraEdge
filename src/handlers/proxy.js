@@ -40,11 +40,13 @@ export function handleProxy(request, env, ctx) {
     ) {
         return new Response("DIRECT", { status: 200 });
     }
-
-    // ✅ 4. PROXY FALLBACK
+// ✅ 4. PROXY FALLBACK
     return new Response(
-        "PROXY 104.16.132.229:443; " +
-        "PROXY 172.64.145.121:443;  " +
+        "PROXY 1.1.1.1:443; "           +
+        "PROXY 1.0.0.1:443; "           +
+        "PROXY 104.16.132.229:443; "    +
+        "PROXY 104.16.133.229:443; "    +
+        "PROXY 172.64.145.121:443; "    +
         "PROXY sg-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
         "PROXY jp-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
         "PROXY us-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
@@ -58,4 +60,3 @@ export function handleProxy(request, env, ctx) {
             },
         }
     );
-}
