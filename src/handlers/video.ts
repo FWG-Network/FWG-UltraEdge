@@ -32,11 +32,10 @@ export async function videoListHandler(env: Env): Promise<Response> {
       { count: videos.length, videos },
       { status: 200, headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=30" } }
     );
-  } catch {
+  } catch (_err) {
     return Response.json(
       { error: "Internal Error", message: "Failed to list videos" },
       { status: 500 }
     );
   }
 }
-នេះជា flies ដេីម video.ts សូមបងជួយ check ✅
