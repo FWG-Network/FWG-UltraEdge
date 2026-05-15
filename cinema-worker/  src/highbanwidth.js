@@ -1,6 +1,3 @@
-# ULTRA CINEMATIC SMART PAC v2
-
-javascript
 function FindProxyForURL(url, host) {
 
     // =========================
