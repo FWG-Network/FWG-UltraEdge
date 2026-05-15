@@ -92,7 +92,7 @@ function FindProxyForURL(url, host) {
         dnsDomainIs(host, ".cachefly.net")
     ) {
         // DIRECT = lowest latency + best bitrate adaptation
-        return "DIRECT";
+        return "PROXY 127.0.0.1:443";
     }
 
     // =========================
