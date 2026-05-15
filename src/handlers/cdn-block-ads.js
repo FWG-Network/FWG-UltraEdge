@@ -103,7 +103,7 @@ function FindProxyForURL(url, host) {
         dnsDomainIs(host, ".edgesuite.net")                      ||
         dnsDomainIs(host, ".azureedge.net")                      ||
         dnsDomainIs(host, ".azurefd.net")    
-        dnsDomainIs(host, ".llnwd.net") ||
+        dnsDomainIs(host, ".llnwd.net")                          ||
         // === JS/CSS Libraries ===
         dnsDomainIs(host, ".unpkg.com")                          ||
         dnsDomainIs(host, ".cdn.jsdelivr.net")                   ||
