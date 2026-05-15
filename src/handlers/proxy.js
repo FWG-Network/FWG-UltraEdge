@@ -1,6 +1,6 @@
 export function handleProxy(request, env, ctx) {
   // ១. ប្រកាស proxy string
-  var proxy = "PROXY 1.1.1.1:443";
+  var proxy = "PROXY 1.1.1.1:443, PROXY 1.0.0.1:443";
 
   var url = new URL(request.url);
   var host = url.hostname;
