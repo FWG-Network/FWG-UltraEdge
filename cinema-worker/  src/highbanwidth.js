@@ -1,68 +1,140 @@
+# ULTRA CINEMATIC SMART PAC v2
+
+javascript
 function FindProxyForURL(url, host) {
 
-    // 🟢 1. LOCAL NETWORK
+    // =========================
+    // ⚡ FAST DNS CACHE
+    // =========================
+    var ip = dnsResolve(host);
+
+    // =========================
+    // 🟢 1. LOCAL / PRIVATE NETWORKS
+    // =========================
     if (
         isPlainHostName(host) ||
-        isInNet(dnsResolve(host), "127.0.0.1", "255.0.0.0") ||
-        isInNet(dnsResolve(host), "192.168.0.0", "255.255.0.0") ||
-        isInNet(dnsResolve(host), "10.0.0.0", "255.0.0.0")
+        shExpMatch(host, "localhost") ||
+        shExpMatch(host, "127.*") ||
+        shExpMatch(host, "192.168.*") ||
+        shExpMatch(host, "10.*") ||
+        shExpMatch(host, "172.16.*") ||
+        shExpMatch(host, "172.17.*") ||
+        shExpMatch(host, "172.18.*") ||
+        shExpMatch(host, "172.19.*") ||
+        shExpMatch(host, "172.2*.*") ||
+        shExpMatch(host, "172.30.*") ||
+        shExpMatch(host, "172.31.*") ||
+        isInNet(ip, "127.0.0.0", "255.0.0.0") ||
+        isInNet(ip, "10.0.0.0", "255.0.0.0") ||
+        isInNet(ip, "172.16.0.0", "255.240.0.0") ||
+        isInNet(ip, "192.168.0.0", "255.255.0.0")
     ) {
         return "DIRECT";
     }
 
-    // 🎥 2. HIGH BANDWIDTH VIDEO
+    // =========================
+    // 🎥 2. ULTRA VIDEO STREAMING MODE
+    // =========================
+    // PRIORITY:
+    // - Lowest latency
+    // - Maximum buffering speed
+    // - Stable 4K / HDR playback
+    // - Cinematic smoothness
+    // =========================
     if (
-        shExpMatch(host, "*.youtube.com")     ||
-        shExpMatch(host, "*.googlevideo.com") ||
-        shExpMatch(host, "*.ytimg.com")       ||
-        shExpMatch(host, "studio.youtube.com")||
-        shExpMatch(host, "youtu.be")          ||
-        shExpMatch(host, "*.twitch.tv")       ||
-        shExpMatch(host, "*.twitchcdn.net")   ||
-        shExpMatch(host, "*.netflix.com")     ||
-        shExpMatch(host, "*.nflxvideo.net")   ||
-        shExpMatch(host, "*.facebook.com")    ||
-        shExpMatch(host, "*.fbcdn.net")       ||
-        shExpMatch(host, "*.tiktok.com")      ||
-        shExpMatch(host, "*.amemv.com")       ||
-        shExpMatch(host, "*.douyin.com")      ||
-        shExpMatch(host, "*.akamaihd.net")    ||
-        shExpMatch(host, "*.fastly.net")      ||
-        shExpMatch(host, "*.cloudfront.net")  ||
-        shExpMatch(host, "*.edgecastcdn.net")
+        // YouTube
+        dnsDomainIs(host, ".youtube.com") ||
+        dnsDomainIs(host, ".googlevideo.com") ||
+        dnsDomainIs(host, ".ytimg.com") ||
+        shExpMatch(host, "youtu.be") ||
+        shExpMatch(host, "studio.youtube.com") ||
+
+        // Netflix
+        dnsDomainIs(host, ".netflix.com") ||
+        dnsDomainIs(host, ".nflxvideo.net") ||
+        dnsDomainIs(host, ".nflximg.net") ||
+        dnsDomainIs(host, ".nflxext.com") ||
+
+        // Twitch
+        dnsDomainIs(host, ".twitch.tv") ||
+        dnsDomainIs(host, ".twitchcdn.net") ||
+
+        // TikTok
+        dnsDomainIs(host, ".tiktok.com") ||
+        dnsDomainIs(host, ".ibyteimg.com") ||
+        dnsDomainIs(host, ".amemv.com") ||
+
+        // Facebook / Instagram Video
+        dnsDomainIs(host, ".facebook.com") ||
+        dnsDomainIs(host, ".fbcdn.net") ||
+        dnsDomainIs(host, ".instagram.com") ||
+        dnsDomainIs(host, ".cdninstagram.com") ||
+
+        // CDN Optimized
+        dnsDomainIs(host, ".akamaihd.net") ||
+        dnsDomainIs(host, ".fastly.net") ||
+        dnsDomainIs(host, ".cloudfront.net") ||
+        dnsDomainIs(host, ".edgecastcdn.net") ||
+        dnsDomainIs(host, ".llnwd.net") ||
+        dnsDomainIs(host, ".cachefly.net")
     ) {
+        // DIRECT = lowest latency + best bitrate adaptation
         return "DIRECT";
     }
 
-    // 🎮 3. GAMING
+    // =========================
+    // 🎮 3. LOW LATENCY GAMING MODE
+    // =========================
     if (
-        shExpMatch(host, "*.riotgames.com")    ||
-        shExpMatch(host, "*.pubgmobile.com")   ||
-        shExpMatch(host, "*wildrift*")         ||
-        shExpMatch(host, "*.mobilelegends.com")||
-        shExpMatch(host, "*.garena.com")
+        dnsDomainIs(host, ".riotgames.com") ||
+        dnsDomainIs(host, ".leagueoflegends.com") ||
+        dnsDomainIs(host, ".playvalorant.com") ||
+        dnsDomainIs(host, ".pubgmobile.com") ||
+        dnsDomainIs(host, ".steamcontent.com") ||
+        dnsDomainIs(host, ".steampowered.com") ||
+        dnsDomainIs(host, ".epicgames.com") ||
+        dnsDomainIs(host, ".mobilelegends.com") ||
+        dnsDomainIs(host, ".garena.com")
     ) {
         return "DIRECT";
     }
 
-    // ⚡ 4. ESSENTIAL APPS
+    // =========================
+    // ☁️ 4. CORE INTERNET SERVICES
+    // =========================
     if (
-        shExpMatch(host, "*.google.com")    ||
-        shExpMatch(host, "*.gstatic.com")   ||
-        shExpMatch(host, "*.cloudflare.com")||
-        shExpMatch(host, "*.apple.com")     ||
-        shExpMatch(host, "*.icloud.com")
+        dnsDomainIs(host, ".google.com") ||
+        dnsDomainIs(host, ".gstatic.com") ||
+        dnsDomainIs(host, ".cloudflare.com") ||
+        dnsDomainIs(host, ".apple.com") ||
+        dnsDomainIs(host, ".icloud.com") ||
+        dnsDomainIs(host, ".microsoft.com") ||
+        dnsDomainIs(host, ".windowsupdate.com")
     ) {
         return "DIRECT";
     }
 
-    // 🌐 DEFAULT — Proxy Fallback
-    return "PROXY 104.19.237.150:443; "  +
-           "PROXY 104.16.132.229:443:443; "  +
-           "PROXY 172.64.145.121:443; "  +
-           "PROXY 162.159.36.1:443; "    +
-           "PROXY 104.19.237.150:443; "  +
-           "PROXY sg-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
-           "PROXY jp-proxy.fasterwgserverkh.cloudflareaccess.com:8080; " +
-           "PROXY us-proxy.fasterwgserverkh.cloudflareaccess.com:8080;"
+    // =========================
+    // 🚀 5. SMART PROXY ROUTING ENGINE
+    // =========================
+    // ORDER:
+    // 1. Singapore (best SEA latency)
+    // 2. Japan (stable backbone)
+    // 3. US (global fallback)
+    // 4. Cloudflare Anycast backup
+    // =========================
+
+    return (
+        "HTTPS sg-proxy.fasterwgserverkh.cloudflareaccess.com:443; " +
+        "HTTPS jp-proxy.fasterwgserverkh.cloudflareaccess.com:443; " +
+        "HTTPS us-proxy.fasterwgserverkh.cloudflareaccess.com:443; " +
+
+        // Anycast fallback
+        "PROXY 104.19.237.150:443; " +
+        "PROXY 172.64.145.121:443; " +
+        "PROXY 162.159.36.1:443; " +
+
+        // Final fallback
+        "DIRECT"
+    );
 }
