@@ -1,5 +1,21 @@
 function FindProxyForURL(url, host) {
 
+    var ip = dnsResolve(host);
+    var ua = (typeof navigator !== "undefined" && navigator.userAgent)
+        ? navigator.userAgent.toLowerCase()
+        : "";
+
+    // =====================================
+    // 📱 SMART DEVICE DETECTION
+    // =====================================
+    var isMobile =
+        shExpMatch(ua, "*android*") ||
+        shExpMatch(ua, "*iphone*")  ||
+        shExpMatch(ua, "*ipad*")    ||
+        shExpMatch(ua, "*mobile*");
+
+    var isDesktop = !isMobile;
+
     // =========================
     // ⚡ FAST DNS CACHE
     // =========================
