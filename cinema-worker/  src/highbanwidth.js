@@ -82,7 +82,7 @@ function FindProxyForURL(url, host) {
             "HTTPS jp-proxy.fasterwgserverkh.cloudflareaccess.com:443; " +
             "PROXY 104.19.237.150:443; " +
             "PROXY 172.64.145.121:443; " +
-            "PROXY 127.0.0.1:443; "
+            "PROXY 127.0.0.1:443" 
         );
     }
 
