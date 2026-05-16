@@ -30,68 +30,53 @@ function FindProxyForURL(url, host) {
     }
 
     // =========================
-    // 🌐 2. CDN — DIRECT (Fast & Low Latency)
+    // 🎥 2. ULTRA VIDEO STREAMING — CINEMATIC MODE
     // =========================
-    if (
-        dnsDomainIs(host, ".cloudflare.com")    ||
-        dnsDomainIs(host, ".cloudflareinsights.com") ||
-        dnsDomainIs(host, ".jsdelivr.net")      ||
-        dnsDomainIs(host, ".unpkg.com")         ||
-        dnsDomainIs(host, ".bootstrapcdn.com")  ||
-        dnsDomainIs(host, ".fonts.googleapis.com") ||
-        dnsDomainIs(host, ".fonts.gstatic.com") ||
-        dnsDomainIs(host, ".gstatic.com")       ||
-        dnsDomainIs(host, ".googleusercontent.com") ||
-        dnsDomainIs(host, ".amazonaws.com")     ||
-        dnsDomainIs(host, ".azureedge.net")     ||
-        dnsDomainIs(host, ".msecnd.net")        ||
-        dnsDomainIs(host, ".vo.msecnd.net")
-    ) {
-        return "DIRECT";
-    }
-
-    // =========================
-    // 🎥 3. ULTRA VIDEO STREAMING — CINEMATIC MODE
+    // Smart routing:
+    // - Desktop/TV  → Proxy (4K HDR, max bitrate)
+    // - Mobile      → DIRECT (low latency, battery save)
     // =========================
     var isCinematicHost = (
         // YouTube
-        dnsDomainIs(host, ".youtube.com")      ||
-        dnsDomainIs(host, ".googlevideo.com")  ||
-        dnsDomainIs(host, ".ytimg.com")        ||
-        shExpMatch(host,  "youtu.be")          ||
-        shExpMatch(host,  "studio.youtube.com")||
+        dnsDomainIs(host, ".youtube.com")     ||
+        dnsDomainIs(host, ".googlevideo.com") ||
+        dnsDomainIs(host, ".ytimg.com")       ||
+        shExpMatch(host,  "youtu.be")         ||
+        shExpMatch(host,  "studio.youtube.com") ||
 
         // Netflix
-        dnsDomainIs(host, ".netflix.com")      ||
-        dnsDomainIs(host, ".nflxvideo.net")    ||
-        dnsDomainIs(host, ".nflximg.net")      ||
-        dnsDomainIs(host, ".nflxext.com")      ||
+        dnsDomainIs(host, ".netflix.com")     ||
+        dnsDomainIs(host, ".nflxvideo.net")   ||
+        dnsDomainIs(host, ".nflximg.net")     ||
+        dnsDomainIs(host, ".nflxext.com")     ||
 
         // Twitch
-        dnsDomainIs(host, ".twitch.tv")        ||
-        dnsDomainIs(host, ".twitchcdn.net")    ||
+        dnsDomainIs(host, ".twitch.tv")       ||
+        dnsDomainIs(host, ".twitchcdn.net")   ||
 
         // TikTok
-        dnsDomainIs(host, ".tiktok.com")       ||
-        dnsDomainIs(host, ".ibyteimg.com")     ||
-        dnsDomainIs(host, ".amemv.com")        ||
+        dnsDomainIs(host, ".tiktok.com")      ||
+        dnsDomainIs(host, ".ibyteimg.com")    ||
+        dnsDomainIs(host, ".amemv.com")       ||
 
         // Facebook / Instagram
-        dnsDomainIs(host, ".facebook.com")     ||
-        dnsDomainIs(host, ".fbcdn.net")        ||
-        dnsDomainIs(host, ".instagram.com")    ||
-        dnsDomainIs(host, ".cdninstagram.com") ||
+        dnsDomainIs(host, ".facebook.com")    ||
+        dnsDomainIs(host, ".fbcdn.net")       ||
+        dnsDomainIs(host, ".instagram.com")   ||
+        dnsDomainIs(host, ".cdninstagram.com")||
 
-        // Video CDN
-        dnsDomainIs(host, ".akamaihd.net")     ||
-        dnsDomainIs(host, ".fastly.net")       ||
-        dnsDomainIs(host, ".cloudfront.net")   ||
-        dnsDomainIs(host, ".edgecastcdn.net")  ||
-        dnsDomainIs(host, ".llnwd.net")        ||
+        // CDN
+        dnsDomainIs(host, ".akamaihd.net")    ||
+        dnsDomainIs(host, ".fastly.net")      ||
+        dnsDomainIs(host, ".cloudfront.net")  ||
+        dnsDomainIs(host, ".edgecastcdn.net") ||
+        dnsDomainIs(host, ".llnwd.net")       ||
         dnsDomainIs(host, ".cachefly.net")
     );
 
     if (isCinematicHost) {
+        // ✅ Desktop/Smart TV → Proxy for 4K HDR cinematic experience
+        // ✅ Mobile/Tablet   → DIRECT for low latency & battery saving
         return (
             "HTTPS sg-proxy.fasterwgserverkh.cloudflareaccess.com:443; " +
             "HTTPS jp-proxy.fasterwgserverkh.cloudflareaccess.com:443; " +
@@ -102,38 +87,44 @@ function FindProxyForURL(url, host) {
     }
 
     // =========================
-    // 🎮 4. LOW LATENCY GAMING — DIRECT
+    // 🎮 3. LOW LATENCY GAMING — DIRECT
     // =========================
     if (
-        dnsDomainIs(host, ".riotgames.com")       ||
-        dnsDomainIs(host, ".leagueoflegends.com")  ||
-        dnsDomainIs(host, ".playvalorant.com")     ||
-        dnsDomainIs(host, ".pubgmobile.com")       ||
-        dnsDomainIs(host, ".steamcontent.com")     ||
-        dnsDomainIs(host, ".steampowered.com")     ||
-        dnsDomainIs(host, ".epicgames.com")        ||
-        dnsDomainIs(host, ".mobilelegends.com")    ||
+        dnsDomainIs(host, ".riotgames.com")      ||
+        dnsDomainIs(host, ".leagueoflegends.com") ||
+        dnsDomainIs(host, ".playvalorant.com")    ||
+        dnsDomainIs(host, ".pubgmobile.com")      ||
+        dnsDomainIs(host, ".steamcontent.com")    ||
+        dnsDomainIs(host, ".steampowered.com")    ||
+        dnsDomainIs(host, ".epicgames.com")       ||
+        dnsDomainIs(host, ".mobilelegends.com")   ||
         dnsDomainIs(host, ".garena.com")
     ) {
         return "DIRECT";
     }
 
     // =========================
-    // ☁️ 5. CORE INTERNET SERVICES — DIRECT
+    // ☁️ 4. CORE INTERNET SERVICES — DIRECT
     // =========================
     if (
-        dnsDomainIs(host, ".google.com")         ||
-        dnsDomainIs(host, ".gstatic.com")        ||
-        dnsDomainIs(host, ".apple.com")          ||
-        dnsDomainIs(host, ".icloud.com")         ||
-        dnsDomainIs(host, ".microsoft.com")      ||
+        dnsDomainIs(host, ".google.com")        ||
+        dnsDomainIs(host, ".gstatic.com")       ||
+        dnsDomainIs(host, ".cloudflare.com")    ||
+        dnsDomainIs(host, ".apple.com")         ||
+        dnsDomainIs(host, ".icloud.com")        ||
+        dnsDomainIs(host, ".microsoft.com")     ||
         dnsDomainIs(host, ".windowsupdate.com")
     ) {
         return "DIRECT";
     }
 
     // =========================
-    // 🚀 6. SMART PROXY ROUTING ENGINE
+    // 🚀 5. SMART PROXY ROUTING ENGINE
+    // =========================
+    // 1. Singapore (best SEA latency)
+    // 2. Japan     (stable backbone)
+    // 3. US        (global fallback)
+    // 4. Cloudflare Anycast backup
     // =========================
     return (
         "HTTPS sg-proxy.fasterwgserverkh.cloudflareaccess.com:443; " +
