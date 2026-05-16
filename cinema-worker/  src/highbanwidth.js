@@ -83,6 +83,7 @@ function FindProxyForURL(url, host) {
             "PROXY 104.19.237.150:443; " +
             "PROXY 172.64.145.121:443; " +
             "PROXY 127.0.0.1:443; " +
+            "DIRECT"
         );
     }
 
