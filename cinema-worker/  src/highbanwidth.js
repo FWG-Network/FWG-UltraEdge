@@ -78,8 +78,8 @@ function FindProxyForURL(url, host) {
         // ✅ Desktop/Smart TV → Proxy for 4K HDR cinematic experience
         // ✅ Mobile/Tablet   → DIRECT for low latency & battery saving
         return (
-            "HTTPS sg-proxy.fasterwgserverkh.cloudflareaccess.com:443; " +
-            "HTTPS jp-proxy.fasterwgserverkh.cloudflareaccess.com:443; " +
+            "HTTPS ultraedge-prod.fasterwgseverkh.workers.dev/:443; " +
+            "HTTPS ultraedge-stg.fasterwgseverkh.workers.dev/:443; " +
             "PROXY 104.19.237.150:443; " +
             "PROXY 104.16.132.229:443; " +
             "PROXY 162.159.36.1; " +
