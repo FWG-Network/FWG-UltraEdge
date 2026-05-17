@@ -26,7 +26,7 @@ export default {
         },
 
         // 🚀 Compression + optimization
-        polish: "lossless", // image optimize
+        polish: "lossless" as const, // image optimize
         mirage: true,       // mobile image loading
         minify: {
           javascript: true,
@@ -79,19 +79,11 @@ export default {
       });
 
     } catch (err) {
-      // ⚠️ Graceful fallback
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Ultra Edge Worker Error"
-        }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json"
-          }
+      return new Response("Service Unavailable", {
+        status: 503,
+        headers: {
+          "Content-Type": "text/plain",
+          "Retry-After": "30"
         }
-      );
+      });
     }
-  }
-};
