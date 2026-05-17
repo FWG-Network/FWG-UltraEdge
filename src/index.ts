@@ -4,116 +4,109 @@ export default {
       const url = new URL(request.url);
 
       // =========================
-      // SMART STREAM DETECTION
+      // FILE TYPE DETECTION
       // =========================
+      const pathname = url.pathname.toLowerCase();
+
+      const isStaticAsset =
+        pathname.endsWith(".js") ||
+        pathname.endsWith(".css") ||
+        pathname.endsWith(".png") ||
+        pathname.endsWith(".jpg") ||
+        pathname.endsWith(".jpeg") ||
+        pathname.endsWith(".gif") ||
+        pathname.endsWith(".svg") ||
+        pathname.endsWith(".webp");
+
       const isVideo =
-        url.pathname.match(/\.(mp4|mkv|webm|m3u8|ts|mov|avi)$/i);
+        pathname.endsWith(".mp4") ||
+        pathname.endsWith(".m3u8") ||
+        pathname.endsWith(".ts") ||
+        pathname.endsWith(".webm") ||
+        pathname.endsWith(".mov");
 
       // =========================
-      // ULTRA EDGE CONFIG
+      // VIDEO STREAM MODE
       // =========================
-      const cfConfig = {
-        cf: {
-          cacheEverything: true,
-
-          // LONGER EDGE CACHE
-          cacheTtl: isVideo ? 86400 : 3600,
-
-          // Faster stale delivery
-          cacheTtlByStatus: {
-            "200-299": 86400,
-            "404": 60,
-            "500-599": 0
-          },
-
-          // Brotli + compression
-          polish: "off",
-
-          // HTTP optimization
-          httpProtocol: "http2",
-
-          // Prioritize speed
-          mirage: false,
-
-          // Minify only web assets
-          minify: isVideo
-            ? undefined
-            : {
-                javascript: true,
-                css: true,
-                html: true
-              }
-        }
-      };
-
-      // =========================
-      // STREAM OPTIMIZED HEADERS
-      // =========================
-      const headers = new Headers(request.headers);
-
-      headers.set("Connection", "keep-alive");
-
-      // Important for movie/video seek speed
       if (isVideo) {
-        headers.set("Accept-Ranges", "bytes");
+
+        // IMPORTANT:
+        // DO NOT TOUCH STREAM
+        // PASS DIRECTLY
+        const response = await fetch(request, {
+          cf: {
+            cacheEverything: false,
+
+            // Keep edge hot
+            cacheTtl: 0,
+
+            // HTTP optimizations
+            polish: "off",
+            mirage: false
+          }
+        });
+
+        return response;
       }
 
       // =========================
-      // FETCH ORIGIN
+      // STATIC ASSET MODE
       // =========================
-      const originResponse = await fetch(
-        new Request(request, {
+      if (isStaticAsset) {
+
+        const response = await fetch(request, {
+          cf: {
+            cacheEverything: true,
+            cacheTtl: 86400,
+
+            minify: {
+              javascript: true,
+              css: true,
+              html: false
+            },
+
+            brotli: true,
+            polish: "lossless"
+          }
+        });
+
+        const headers = new Headers(response.headers);
+
+        headers.set(
+          "Cache-Control",
+          "public, max-age=86400, immutable"
+        );
+
+        return new Response(response.body, {
+          status: response.status,
           headers
-        }),
-        cfConfig
-      );
+        });
+      }
 
       // =========================
-      // RESPONSE HEADERS
+      // HTML / NORMAL TRAFFIC
       // =========================
-      const responseHeaders = new Headers(originResponse.headers);
+      const response = await fetch(request, {
+        cf: {
+          cacheEverything: false,
 
-      // Edge cache status
-      responseHeaders.set(
-        "Cache-Control",
-        isVideo
-          ? "public, max-age=86400, immutable"
-          : "public, max-age=3600"
-      );
+          minify: {
+            html: true,
+            css: true,
+            javascript: true
+          },
 
-      // Better streaming
-      responseHeaders.set("Accept-Ranges", "bytes");
-
-      // Faster browser connection reuse
-      responseHeaders.set(
-        "Keep-Alive",
-        "timeout=20, max=1000"
-      );
-
-      // Optional debug
-      responseHeaders.set("X-Ultra-Speed", "GOD-MODE");
-
-      // =========================
-      // RETURN FAST RESPONSE
-      // =========================
-      return new Response(originResponse.body, {
-        status: originResponse.status,
-        statusText: originResponse.statusText,
-        headers: responseHeaders
+          brotli: true
+        }
       });
+
+      return response;
 
     } catch (err) {
 
       return new Response(
-        JSON.stringify({
-          error: "Ultra Worker Failure"
-        }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json"
-          }
-        }
+        "Edge Failure",
+        { status: 500 }
       );
     }
   }
