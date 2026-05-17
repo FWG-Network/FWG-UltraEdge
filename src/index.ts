@@ -1,243 +1,89 @@
-/**
- * ULTRA ENTERPRISE STREAMING WORKER
- * Production-Grade Edge Streaming Architecture
- * Optimized For:
- * - Video Streaming
- * - Ultra Low Latency
- * - Smooth Seeking
- * - Enterprise CDN Behavior
- * - Business Production Usage
- */
-
 export default {
-  async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
+    // 🚫 Block bad bots / suspicious spam requests
+    const userAgent = request.headers.get("user-agent") || "";
+
+    if (
+      userAgent.includes("curl") ||
+      userAgent.includes("wget") ||
+      userAgent.includes("python")
+    ) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    // ⚡ ULTRA EDGE CONFIG
+    const cfConfig = {
+      cf: {
+        // 🚀 Smart caching
+        cacheEverything: true,
+        cacheTtl: 86400, // 24h edge cache
+        cacheTtlByStatus: {
+          "200-299": 86400,
+          "404": 60,
+          "500-599": 0
+        },
+
+        // 🚀 Compression + optimization
+        polish: "lossless", // image optimize
+        mirage: true,       // mobile image loading
+        minify: {
+          javascript: true,
+          css: true,
+          html: true
+        },
+
+        // 🚀 Priority routing
+        priority: "weight=256;exclusive=1",
+
+        // 🚀 HTTP/3 + QUIC optimization
+        scrapeShield: false,
+
+        // 🚀 Faster TCP handling
+        tcpKeepAlive: true
+      }
+    };
 
     try {
+      // ⚡ Origin fetch
+      const originResponse = await fetch(request, cfConfig);
 
-      const url = new URL(request.url);
-      const pathname = url.pathname.toLowerCase();
+      // 🔥 Clone headers safely
+      const headers = new Headers(originResponse.headers);
 
-      // =========================================
-      // FILE DETECTION
-      // =========================================
+      // 🚀 Security + performance headers
+      headers.set("X-Frame-Options", "SAMEORIGIN");
+      headers.set("X-Content-Type-Options", "nosniff");
+      headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 
-      const isVideo =
-        pathname.endsWith(".mp4") ||
-        pathname.endsWith(".m3u8") ||
-        pathname.endsWith(".ts") ||
-        pathname.endsWith(".m4s") ||
-        pathname.endsWith(".mov") ||
-        pathname.endsWith(".webm") ||
-        pathname.endsWith(".mkv");
+      // 🚀 Streaming optimization
+      headers.set("Accept-Ranges", "bytes");
 
-      const isStatic =
-        pathname.endsWith(".js") ||
-        pathname.endsWith(".css") ||
-        pathname.endsWith(".png") ||
-        pathname.endsWith(".jpg") ||
-        pathname.endsWith(".jpeg") ||
-        pathname.endsWith(".gif") ||
-        pathname.endsWith(".svg") ||
-        pathname.endsWith(".webp") ||
-        pathname.endsWith(".woff2");
-
-      // =========================================
-      // SHARED HEADERS
-      // =========================================
-
-      const reqHeaders = new Headers(request.headers);
-
-      // Connection optimization
-      reqHeaders.set("Connection", "keep-alive");
-
-      // Better compression negotiation
-      reqHeaders.set(
-        "Accept-Encoding",
-        "br, gzip"
-      );
-
-      // Faster browser prioritization
-      reqHeaders.set(
-        "Priority",
-        "u=1, i"
-      );
-
-      // =========================================
-      // VIDEO STREAMING ENGINE
-      // =========================================
-
-      if (isVideo) {
-
-        // NEVER buffer stream in worker
-        // NEVER clone full body
-        // NEVER minify video traffic
-
-        const response = await fetch(
-          new Request(request, {
-            headers: reqHeaders
-          }),
-          {
-            cf: {
-
-              // Ultra streaming optimization
-              cacheEverything: false,
-
-              // Reduce edge processing
-              apps: false,
-
-              // Disable unnecessary image/video transforms
-              polish: "off",
-              mirage: false,
-
-              // Smart protocol selection
-              httpProtocol: "http3",
-
-              // Origin shield behavior
-              cacheTtl: 0
-            }
-          }
-        );
-
-        // Preserve native streaming behavior
-        const headers = new Headers(response.headers);
-
-        // Critical for smooth seeking
-        headers.set(
-          "Accept-Ranges",
-          "bytes"
-        );
-
-        // Connection reuse
-        headers.set(
-          "Keep-Alive",
-          "timeout=30, max=1000"
-        );
-
-        // Streaming hint
-        headers.set(
-          "X-Streaming-Mode",
-          "enterprise-ultra"
-        );
-
-        // Better browser buffering logic
-        headers.set(
-          "Cache-Control",
-          "public, no-transform"
-        );
-
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers
-        });
-      }
-
-      // =========================================
-      // STATIC ASSET ENGINE
-      // =========================================
-
-      if (isStatic) {
-
-        const response = await fetch(
-          new Request(request, {
-            headers: reqHeaders
-          }),
-          {
-            cf: {
-
-              // Aggressive enterprise cache
-              cacheEverything: true,
-
-              // 7 days edge cache
-              cacheTtl: 604800,
-
-              // Smart compression
-              brotli: true,
-
-              // Asset optimization
-              minify: {
-                javascript: true,
-                css: true,
-                html: false
-              },
-
-              // Image optimization
-              polish: "lossless",
-
-              // Faster transport
-              httpProtocol: "http3"
-            }
-          }
-        );
-
-        const headers = new Headers(response.headers);
-
-        headers.set(
-          "Cache-Control",
-          "public, max-age=604800, immutable"
-        );
-
-        headers.set(
-          "X-Asset-Engine",
-          "enterprise-cache"
-        );
-
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers
-        });
-      }
-
-      // =========================================
-      // HTML / API / NORMAL TRAFFIC
-      // =========================================
-
-      const response = await fetch(
-        new Request(request, {
-          headers: reqHeaders
-        }),
-        {
-          cf: {
-
-            // Dynamic optimization
-            cacheEverything: false,
-
-            // Smart compression
-            brotli: true,
-
-            // HTML optimization
-            minify: {
-              html: true,
-              css: true,
-              javascript: true
-            },
-
-            // Faster protocol
-            httpProtocol: "http3"
-          }
-        }
-      );
-
-      const headers = new Headers(response.headers);
-
+      // 🚀 Browser cache
       headers.set(
-        "X-Edge-System",
-        "ultra-enterprise"
+        "Cache-Control",
+        "public, max-age=86400, stale-while-revalidate=3600"
       );
 
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
+      // 🚀 Low latency hints
+      headers.set("Connection", "keep-alive");
+
+      // 🚀 Prevent unnecessary transforms
+      headers.set("CDN-Cache-Control", "max-age=86400");
+
+      return new Response(originResponse.body, {
+        status: originResponse.status,
+        statusText: originResponse.statusText,
         headers
       });
 
-    } catch (error) {
-
+    } catch (err) {
+      // ⚠️ Graceful fallback
       return new Response(
         JSON.stringify({
           success: false,
-          message: "Ultra Enterprise Edge Failure"
+          error: "Ultra Edge Worker Error"
         }),
         {
           status: 500,
