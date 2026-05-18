@@ -237,11 +237,7 @@ export default function SecurityAudit() {
       overflowX: "hidden"
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Bebas+Neue&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #0a0a0f; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+       @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Bebas+Neue&display=swap');
         
         .header-grid {
           background: linear-gradient(180deg, #0f0f1a 0%, #0a0a0f 100%);
