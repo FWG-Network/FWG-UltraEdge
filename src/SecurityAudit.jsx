@@ -1,24 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"; // ១. ថែម useEffect មកដែរ
 
-const findings = [
-  {
-    id: "C-001",
-    severity: "CRITICAL",
-    category: "Secret Exposure via Shell Expansion",
-    icon: "💀",
-    color: "#ff2d55",
-    glow: "rgba(255,45,85,0.4)",
-    location: "Job 8, 9, 10 — Slack notification steps",
-    vuln: `curl -d "{...\"Branch\": \"${{ github.ref_name }}\"...}"`,
-    detail: "github.ref_name is interpolated directly into a JSON string passed to curl. A branch named: main\",\"evil\":\"injected — can break the JSON structure and potentially inject arbitrary Slack message fields or exfiltrate runner env vars via webhook payload manipulation.",
-    impact: "Slack message injection, data exfiltration to attacker-controlled webhook if webhook URL is ever rotated to malicious endpoint.",
-    fix: [
-      "Use jq to build JSON safely: jq -n --arg branch \"$REF\" '{text: $branch}'",
-      "Never interpolate shell vars directly into JSON strings",
-      "Assign github.ref_name to an env var first, then use jq"
-    ],
-    code: `# ✅ SAFE\nREF=\"${{ steps.ref-sanitize.outputs.safe_ref }}\"\npayload=$(jq -n \\\n  --arg branch \"$REF\" \\\n  --arg sha \"${{ github.sha }}\" \\\n  '{text: (\"Branch: \" + $branch + \" SHA: \" + $sha)}')\ncurl -s -X POST \"${WEBHOOK}\" \\\n  -H \"Content-Type: application/json\" \\\n  -d \"$payload\"`
-  },
+// បង្កើត State សម្រាប់ទាញទិន្នន័យពិតពី GitHub
+  const [findings, setFindings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function startAudit() {
+      try {
+        // បងត្រូវប្តូរ USERNAME និង REPO_NAME ឱ្យត្រូវនឹងរបស់បង
+        const response = await fetch(`https://api.github.com/repos/USERNAME/REPO_NAME/code-scanning/alerts`, {
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+        const data = await response.json();
+
+        // បំប្លែងទិន្នន័យពី GitHub ឱ្យមកចូលក្នុង Dashboard បង
+        const mappedData = data.map(alert => ({
+          id: `GH-${alert.number}`,
+          severity: alert.rule.security_severity_level?.toUpperCase() || "HIGH",
+          category: alert.tool.name,
+          icon: alert.rule.security_severity_level === 'critical' ? "💀" : "⚠️",
+          color: alert.rule.security_severity_level === 'critical' ? "#ff2d55" : "#ffcc00",
+          location: alert.most_recent_instance.location.path,
+          detail: alert.rule.description,
+          impact: "Security risk detected in GitHub Scan",
+          fix: ["Update the affected code", "Check GitHub Security tab for more info"],
+          code: alert.html_url
+        }));
+
+        setFindings(mappedData);
+        setLoading(false);
+      } catch (err) {
+        console.error("API Error:", err);
+        setLoading(false);
+      }
+    }
+
+    startAudit();
+  }, []);
+
+  // បើកំពុងទាញទិន្នន័យ ឱ្យវាបង្ហាញពាក្យ Loading សិន
+  if (loading) return <div style={{color: 'white', textAlign: 'center', marginTop: '100px'}}>កំពុងភ្ជាប់ទៅ GitHub Security API...</div>;
   {
     id: "C-002",
     severity: "CRITICAL",
