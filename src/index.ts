@@ -1,4 +1,5 @@
-/**
+import { withSentry } from "@sentry/cloudflare";
+
  * FWG-UltraEdge — Cloudflare Worker
  * Security hardening applied:
  *   [1] CORS wildcard → explicit allowlist
@@ -125,7 +126,13 @@ function applySecurityHeaders(headers: Headers, corsOrigin: string | null): void
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
-export default {
+export default withSentry(
+  (env: Env) => ({
+    dsn: "https://8b2b7c964d66972f73628c012170dae2@o4511416806342656.ingest.us.sentry.io/4511417333186560",
+    tracesSampleRate: 1.0,
+  }),
+  {
+    // ____old logic 
   async fetch(
     request: Request,
     _env: Env,
@@ -219,5 +226,7 @@ export default {
         },
       });
     }
-  },
-};
+    }
+  }
+);
+  
