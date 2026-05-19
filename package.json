@@ -1,17 +1,22 @@
 {
   "dependencies": {
     "@sentry/cloudflare": "^10.53.1",
-    "itty-router": "^5.0.23"
+    "itty-router": "^5.0.23",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.15.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260511.1",
     "@eslint/js": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^8.59.3",
     "@typescript-eslint/parser": "^8.59.3",
+    "@vitejs/plugin-react": "^6.0.2",
     "bun-types": "^1.3.14",
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13"
   },
   "name": "fwg-ultraedge",
   "version": "3.0.0",
