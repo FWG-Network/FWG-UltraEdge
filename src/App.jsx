@@ -1,13 +1,4 @@
-import { RouterProvider } from 'react-router-dom'; // ឬតាម Router ដែលបងប្រើ
-import { router } from './router'; 
-import { Providers } from './providers';
-
-function App() {
-  return (
-    <Providers>
-      <RouterProvider router={router} />
-    </Providers>
-  );
+import SecurityAudit from './SecurityAudit'
+export default function App() {
+  return <SecurityAudit />
 }
-
-export default App;
