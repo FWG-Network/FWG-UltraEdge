@@ -128,3 +128,15 @@ class_name = "SmartRouter"
 [[env.production.migrations]]
 tag                = "v1"
 new_sqlite_classes = ["SmartRouter"]
+
+# Production environment
+[env.production]
+kv_namespaces = [
+  { binding = "KV_NAMESPACE_PROD", id = "$KV_NAMESPACE_PROD_ID" }
+]
+
+# Staging environment
+[env.staging]
+kv_namespaces = [
+  { binding = "KV_NAMESPACE_STAGING", id = "$KV_NAMESPACE_STAGING_ID" }
+]
