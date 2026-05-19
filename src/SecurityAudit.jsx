@@ -8,7 +8,7 @@ import { useState, useEffect } from "react"; // ១. ថែម useEffect មក�
     async function startAudit() {
       try {
         // បងត្រូវប្តូរ USERNAME និង REPO_NAME ឱ្យត្រូវនឹងរបស់បង
-        const response = await fetch(`https://api.github.com/repos/USERNAME/REPO_NAME/code-scanning/alerts`, {
+        const response = await fetch(`https://api.github.com/repos/FWG-Network/FWG-UltraEdge/code-scanning/alerts`, {
           headers: {
             'Authorization': `Bearer ${import.meta.env.VITE_GITHUB_TOKEN}`,
             'Accept': 'application/vnd.github.v3+json'
