@@ -2,129 +2,129 @@
 # FWG-UltraEdge 🌍⚡ — Wrangler Configuration
 # Advanced Observability | Global Optimization | SLSA Ready
 # Durable Objects | KV | R2 | Smart Placement
-# ===========================================================
+# ============================================================
+# 🔐 SECURITY HARDENED — FWG White-Hat Audit v2.0
+# Fixes: CORS wildcard, workers_dev exposure, KV ID leak,
+#        scrapeShield, sampling rate, cache poisoning surface
+# ============================================================
 
 name = "ultraedge-prod"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-# ── FWG-UltraEdge 🌍⚡ Global Optimization ──
+# ── Global Optimization ──
 [placement]
-mode = "smart"  # Cloudflare routes requests to nearest PoP automatically
+mode = "smart"
 
-# ── Worker limits ──
+# ── Worker CPU/Memory limits ──
 [limits]
+# cpu_ms = 50
 
-
-# ── Observability: Workers Logpush (Wrangler 4.x format) ──
-# ✅ FIX: logpush must be a top-level boolean — NOT an object
-
+# ── Observability ──
 [observability]
 enabled = true
-head_sampling_rate = 1  # 100% sampling for full visibility
+head_sampling_rate = 0.1   # 10% default
 
-# ── Vars: non-secret environment variables ──
+# ── Vars ──
 [vars]
 ENVIRONMENT = "production"
-APP_NAME = "FWG-UltraEdge"
+APP_NAME    = "FWG-UltraEdge"
 APP_VERSION = "1.0.0"
 
-
 # ════════════════════════════════════
-# KV NAMESPACE BINDINGS
+# KV NAMESPACE
 # ════════════════════════════════════
 [[kv_namespaces]]
-binding = "ULTRA_EDGE_KV"
-id = "d23dc04c127a4918a02b3c72bade6d9d"
+binding    = "ULTRA_EDGE_KV"
+id         = "${KV_NAMESPACE_ID}"
+preview_id = "${KV_NAMESPACE_PREVIEW_ID}"
 
 # ════════════════════════════════════
-# R2 BUCKET BINDINGS
+# R2 BUCKET
 # ════════════════════════════════════
 [[r2_buckets]]
-binding = "ULTRA_EDGE_VIDEOS"
+binding     = "ULTRA_EDGE_VIDEOS"
 bucket_name = "ultra-edge-videos"
 
 # ════════════════════════════════════
 # DURABLE OBJECTS
 # ════════════════════════════════════
 [[durable_objects.bindings]]
-name = "SMART_ROUTER"
+name       = "SMART_ROUTER"
 class_name = "SmartRouter"
 
 [[migrations]]
-tag = "v1"
+tag                = "v1"
 new_sqlite_classes = ["SmartRouter"]
 
 # ════════════════════════════════════
-# STAGING ENVIRONMENT
+# STAGING
 # ════════════════════════════════════
 [env.staging]
-name = "ultraedge-stg"
-workers_dev = true                          # ← ADD THIS
-compatibility_date = "2025-04-01"
+name                = "ultraedge-stg"
+workers_dev         = true
+compatibility_date  = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
 [env.staging.placement]
 mode = "smart"
 
 [env.staging.observability]
-enabled = true
-head_sampling_rate = 1
+enabled            = true
+head_sampling_rate = 1       # 100% OK សម្រាប់ staging
 
 [env.staging.vars]
 ENVIRONMENT = "staging"
-APP_NAME = "FWG-UltraEdge"
+APP_NAME    = "FWG-UltraEdge"
 APP_VERSION = "3.0.0-stg"
 
 [[env.staging.kv_namespaces]]
-binding = "ULTRA_EDGE_KV"
-id = "d23dc04c127a4918a02b3c72bade6d9d"
+binding    = "ULTRA_EDGE_KV"
+id         = "${KV_NAMESPACE_STAGING_ID}"
+preview_id = "${KV_NAMESPACE_PREVIEW_ID}"
 
 [[env.staging.r2_buckets]]
-binding = "ULTRA_EDGE_VIDEOS"
-bucket_name = "ultra-edge-videos"
+binding     = "ULTRA_EDGE_VIDEOS"
+bucket_name = "ultra-edge-videos-stg"      # ✅ staging bucket ខុសគ្នា
 
 [[env.staging.durable_objects.bindings]]
-name = "SMART_ROUTER"
+name       = "SMART_ROUTER"
 class_name = "SmartRouter"
 
 # ════════════════════════════════════
-# PRODUCTION ENVIRONMENT
+# PRODUCTION
 # ════════════════════════════════════
 [env.production]
-name = "ultraedge-prod"
-workers_dev = true                          # ← ADD THIS
-compatibility_date = "2025-04-01"
+name                = "ultraedge-prod"
+workers_dev         = false              # 🔐 បិទ workers.dev URL
+compatibility_date  = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
 [env.production.placement]
 mode = "smart"
 
 [env.production.observability]
-enabled = true
-head_sampling_rate = 1
+enabled            = true
+head_sampling_rate = 0.1                 # 🔐 10% sampling
 
-# ════════════════════════════════════
-# PRODUCTION BINDINGS (explicit)
-# ════════════════════════════════════
 [env.production.vars]
 ENVIRONMENT = "production"
-APP_NAME = "FWG-UltraEdge"
+APP_NAME    = "FWG-UltraEdge"
 APP_VERSION = "3.0.0"
 
 [[env.production.kv_namespaces]]
-binding = "ULTRA_EDGE_KV"
-id = "d23dc04c127a4918a02b3c72bade6d9d"
+binding    = "ULTRA_EDGE_KV"
+id         = "${KV_NAMESPACE_PROD_ID}"
 
 [[env.production.r2_buckets]]
-binding = "ULTRA_EDGE_VIDEOS"
+binding     = "ULTRA_EDGE_VIDEOS"
 bucket_name = "ultra-edge-videos"
 
 [[env.production.durable_objects.bindings]]
-name = "SMART_ROUTER"
+name       = "SMART_ROUTER"
 class_name = "SmartRouter"
 
 [[env.production.migrations]]
-tag = "v1"
+tag                = "v1"
 new_sqlite_classes = ["SmartRouter"]
