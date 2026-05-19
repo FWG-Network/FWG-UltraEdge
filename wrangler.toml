@@ -128,12 +128,3 @@ class_name = "SmartRouter"
 [[env.production.migrations]]
 tag = "v1"
 new_sqlite_classes = ["SmartRouter"]
-
-# . បន្ថែម GitHub Secrets
-KV_NAMESPACE_PROD_ID=your-prod-kv-id
-KV_NAMESPACE_STAGING_ID=your-staging-kv-id
-KV_NAMESPACE_PREVIEW_ID=your-preview-kv-id
-
-# . Register Cloudflare secrets
-wrangler secret put ALLOWED_ORIGINS --env production
-wrangler secret put AUTH_TOKEN --env production
