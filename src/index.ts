@@ -1,3 +1,13 @@
+async fetch(request, env, ctx) {
+  const url = new URL(request.url);
+  
+  // 🎯 កូដសម្រាប់កូនក្មេងតេស្តឱ្យលោត Error ទៅ Sentry
+  if (url.pathname === "/test-sentry-error") {
+    throw new Error("⚠️ តេស្តប្រព័ន្ធអាសន្ន៖ Sentry កំពុងដំណើរការក្នុង FWG-UltraEdge!");
+  }
+
+  // កូដចាស់ៗរបស់បងខាងក្រោមទុកដដែល...
+
 import { withSentry } from "@sentry/cloudflare";
 
  * FWG-UltraEdge — Cloudflare Worker
