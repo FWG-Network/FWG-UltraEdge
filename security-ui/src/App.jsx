@@ -1,11 +1,5 @@
 import SecurityAudit from './SecurityAudit';
 
-function App() {
-  return (
-    <div className="App">
-      <SecurityAudit />
-    </div>
-  );
+export default function App() {
+  return <SecurityAudit />;
 }
-
-export default App;
