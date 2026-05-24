@@ -8,7 +8,15 @@
     "noEmit": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "types": ["@cloudflare/workers-types"]
+    "types": ["@cloudflare/workers-types"],
+
+    // 🔐 Security & Type Safety — FWG Audit v4.0
+    "noUncheckedIndexedAccess":    true,
+    "noImplicitOverride":          true,
+    "noImplicitReturns":           true,
+    "exactOptionalPropertyTypes":  true,
+    "noFallthroughCasesInSwitch":  true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", ".wrangler", "test"]
