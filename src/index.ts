@@ -40,8 +40,8 @@ export interface Env {
 // ─── [FIX-5] CORS Allowlist ───────────────────────────────────────────────────
 // ប្រើ explicit origins — កុំ "*" ឡើយ!
 const ALLOWED_ORIGINS = new Set<string>([
-  "https://ultraedge-prod.fasterwgseverkh.workers.dev",
-  "https://ultraedge-stg.fasterwgseverkh.workers.dev",
+  "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",
+  "https://ultraedge-stg.fasterwgseverkh.workers.dev/:443",
   // បន្ថែម custom domain នៅទីនេះ បើមាន
   // "https://fwg.yourdomain.com",
 ]);
