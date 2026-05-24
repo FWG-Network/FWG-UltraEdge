@@ -48,8 +48,8 @@ export interface Env {
 // ─── [1] CORS Allowlist ───────────────────────────────────────────────────────
 // [V5] :443 removed — browsers never include port in HTTPS Origin header
 const ALLOWED_ORIGINS = new Set<string>([
-  "https://ultraedge-prod.fasterwgseverkh.workers.dev",
-  "https://ultraedge-stg.fasterwgseverkh.workers.dev",
+  "https://ultraedge-prod.fasterwgseverkh.workers.dev/",
+  "https://ultraedge-stg.fasterwgseverkh.workers.dev/",
   // "https://fwg.yourdomain.com",
 ]);
 
