@@ -1,45 +1,61 @@
-import { withSentry } from "@sentry/cloudflare";
-
+/**
  * FWG-UltraEdge — Cloudflare Worker
- * Security hardening applied:
- *   [1] CORS wildcard → explicit allowlist
- *   [2] scrapeShield: false → true
- *   [3] Prefetch Link header → path sanitised + validated
- *   [4] UA check → pattern-hardened, not trivially bypassable
- *   [5] CSP + Permissions-Policy headers added
- *   [6] X-Frame-Options: SAMEORIGIN → DENY
+ * ============================================================
+ * 🔐 SECURITY HARDENED — FWG White-Hat Audit v4.0
+ * Fixes:
+ *   [FIX-1] SENTRY_DSN hardcode → env.SENTRY_DSN (secret)
+ *   [FIX-2] tracesSampleRate 1.0 → 0.1 នៅ production
+ *   [FIX-3] catch block → Sentry.captureException
+ *   [FIX-4] Env interface ពេញលេញ
+ *   [FIX-5] CORS allowlist — explicit origins
+ *   [FIX-6] UA blocking — hardened regex
+ *   [FIX-7] Path sanitisation — CRLF injection prevention
+ *   [FIX-8] Security headers ពេញលេញ
+ *   [FIX-9] Rate limiting via KV
+ * ============================================================
  */
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-// Extend when you add KV / D1 / secret bindings in wrangler.toml
+import { withSentry } from "@sentry/cloudflare";
+import * as Sentry from "@sentry/cloudflare";
+
+// ─── Env Interface ────────────────────────────────────────────────────────────
+// Bindings ទាំងអស់ត្រូវប្រកាសនៅទីនេះ
 export interface Env {
-  // KV_NAMESPACE_PROD:    KVNamespace;
-  // KV_NAMESPACE_STAGING: KVNamespace;
+  // 🔐 Secrets (wrangler secret put)
+  SENTRY_DSN:        string;
+  CF_CLIENT_ID:      string;
+  CF_CLIENT_SECRET:  string;
+
+  // KV / R2 / Durable Objects
+  ULTRA_EDGE_KV:     KVNamespace;
+  ULTRA_EDGE_VIDEOS: R2Bucket;
+  SMART_ROUTER:      DurableObjectNamespace;
+
+  // Vars (wrangler.toml [vars])
+  ENVIRONMENT:  string;
+  APP_NAME:     string;
+  APP_VERSION:  string;
 }
 
-// ─── [1] CORS allowlist ───────────────────────────────────────────────────────
-// List every legitimate first-party origin explicitly.
-// Never use "*" — it defeats credentialed-request protection entirely.
+// ─── [FIX-5] CORS Allowlist ───────────────────────────────────────────────────
+// ប្រើ explicit origins — កុំ "*" ឡើយ!
 const ALLOWED_ORIGINS = new Set<string>([
-  "https://fwg-ultraedge.example.com",
-  "https://staging.fwg-ultraedge.example.com",
-  // "https://partner.example.net",   ← add real partner origins here
+  "https://ultraedge-prod.fasterwgseverkh.workers.dev",
+  "https://ultraedge-stg.fasterwgseverkh.workers.dev",
+  // បន្ថែម custom domain នៅទីនេះ បើមាន
+  // "https://fwg.yourdomain.com",
 ]);
 
 function resolveCorsOrigin(request: Request): string | null {
   const origin = request.headers.get("Origin");
   if (origin && ALLOWED_ORIGINS.has(origin)) return origin;
-  return null; // omit CORS headers entirely for unlisted origins
+  return null;
 }
 
-// ─── [3] Prefetch link sanitisation ──────────────────────────────────────────
-// Vulnerability: url.pathname was injected directly into the Link header.
-// Fix: reconstruct path from a *numeric capture only*, then validate the
-//      result against a strict allowlist pattern before emitting the header.
+// ─── [FIX-7] Prefetch Link Sanitisation ──────────────────────────────────────
 const SAFE_PATH_RE = /^[a-zA-Z0-9._\-/]+$/;
 
 function buildNextSegmentLink(pathname: string): string | null {
-  // Capture the directory prefix and the numeric segment index separately.
   const match = pathname.match(/^(.*\/)(\d+)\.ts$/);
   if (!match) return null;
 
@@ -47,19 +63,15 @@ function buildNextSegmentLink(pathname: string): string | null {
   const nextIndex = parseInt(numStr, 10) + 1;
   const nextPath  = `${dir}${nextIndex}.ts`;
 
-  // Validate the *constructed* path — never trust raw user input.
-  if (!SAFE_PATH_RE.test(nextPath))           return null;
-  if (nextPath.includes("://"))               return null; // no scheme smuggling
-  if (nextPath.startsWith("//"))              return null; // no protocol-relative URLs
-  if (nextPath.includes("\n") || nextPath.includes("\r")) return null; // no CRLF injection
+  if (!SAFE_PATH_RE.test(nextPath))                        return null;
+  if (nextPath.includes("://"))                            return null;
+  if (nextPath.startsWith("//"))                           return null;
+  if (nextPath.includes("\n") || nextPath.includes("\r"))  return null;
 
   return `<${nextPath}>; rel=prefetch`;
 }
 
-// ─── [4] User-Agent validation ────────────────────────────────────────────────
-// Original check used .includes("curl") — trivially bypassed with any custom UA.
-// Fix: match against a regex that covers tool signatures regardless of version
-//      strings, capitalisation, or minor prefix variations.
+// ─── [FIX-6] UA Blocking ─────────────────────────────────────────────────────
 const BLOCKED_UA_RE =
   /^\s*$|curl\/|wget\/|python[-/\s]|python-requests|go-http-client|java\/|libwww-perl|scrapy|mechanize/i;
 
@@ -68,11 +80,27 @@ function isBlockedUA(request: Request): boolean {
   return BLOCKED_UA_RE.test(ua);
 }
 
-// ─── [5][6] Security response headers ────────────────────────────────────────
+// ─── [FIX-9] Rate Limiting via KV ────────────────────────────────────────────
+async function isRateLimited(request: Request, env: Env): Promise<boolean> {
+  try {
+    const ip  = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const key = `ratelimit:${ip}`;
+    const current = parseInt((await env.ULTRA_EDGE_KV.get(key)) ?? "0");
+    if (current > 100) return true; // 100 req/min
+    await env.ULTRA_EDGE_KV.put(key, String(current + 1), {
+      expirationTtl: 60,
+    });
+    return false;
+  } catch {
+    // បើ KV error → មិន block traffic
+    return false;
+  }
+}
+
+// ─── [FIX-8] Security Headers ────────────────────────────────────────────────
 function applySecurityHeaders(headers: Headers, corsOrigin: string | null): void {
 
-  // [1] CORS — reflect the verified origin only; include Vary so caches
-  //     do not serve a credentialed response to a different origin.
+  // CORS
   if (corsOrigin) {
     headers.set("Access-Control-Allow-Origin",  corsOrigin);
     headers.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
@@ -81,11 +109,11 @@ function applySecurityHeaders(headers: Headers, corsOrigin: string | null): void
     headers.set("Vary", "Origin");
   }
 
-  // HSTS — 2-year max-age, subdomains, preload-ready
+  // HSTS — 2 ឆ្នាំ
   headers.set("Strict-Transport-Security",
     "max-age=63072000; includeSubDomains; preload");
 
-  // [6] Clickjacking — DENY is correct for a CDN Worker (not a framed page)
+  // Clickjacking
   headers.set("X-Frame-Options", "DENY");
 
   // MIME sniffing
@@ -94,21 +122,19 @@ function applySecurityHeaders(headers: Headers, corsOrigin: string | null): void
   // Referrer
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 
-  // [5a] Content-Security-Policy
-  // Worker serves streaming/API responses — lock down to bare minimum.
-  // Tune script-src / style-src if you ever serve HTML documents.
+  // CSP
   headers.set("Content-Security-Policy", [
     "default-src 'none'",
-    "media-src 'self'",          // allow video / audio from same origin
+    "media-src 'self'",
     "connect-src 'self'",
     "img-src 'self'",
-    "frame-ancestors 'none'",   // belt-and-braces alongside X-Frame-Options
+    "frame-ancestors 'none'",
     "base-uri 'none'",
     "form-action 'none'",
     "upgrade-insecure-requests",
   ].join("; "));
 
-  // [5b] Permissions-Policy — opt out of every browser capability not used
+  // Permissions Policy
   headers.set("Permissions-Policy", [
     "geolocation=()",
     "camera=()",
@@ -116,117 +142,135 @@ function applySecurityHeaders(headers: Headers, corsOrigin: string | null): void
     "payment=()",
     "usb=()",
     "bluetooth=()",
-    "interest-cohort=()",        // opt out of Topics API
+    "interest-cohort=()",
   ].join(", "));
 
-  // Cross-Origin isolation (required for SharedArrayBuffer / high-res timers)
+  // Cross-Origin Isolation
   headers.set("Cross-Origin-Opener-Policy",   "same-origin");
   headers.set("Cross-Origin-Embedder-Policy", "require-corp");
   headers.set("Cross-Origin-Resource-Policy", "same-site");
 }
 
-// ─── Main handler ─────────────────────────────────────────────────────────────
+// ─── Main Handler ─────────────────────────────────────────────────────────────
 export default withSentry(
+  // [FIX-1] SENTRY_DSN ពី secret — មិន hardcode!
   (env: Env) => ({
-    dsn: "https://8b2b7c964d66972f73628c012170dae2@o4511416806342656.ingest.us.sentry.io/4511417333186560",
-    tracesSampleRate: 1.0,
+    dsn: env.SENTRY_DSN,
+    // [FIX-2] tracesSampleRate — 10% production, 100% staging
+    tracesSampleRate: env.ENVIRONMENT === "production" ? 0.1 : 1.0,
+    environment: env.ENVIRONMENT,
+    release: env.APP_VERSION,
   }),
   {
-    // ____old logic 
-  async fetch(
-    request: Request,
-    _env: Env,
-    _ctx: ExecutionContext,
-  ): Promise<Response> {
+    async fetch(
+      request: Request,
+      env: Env,
+      _ctx: ExecutionContext,
+    ): Promise<Response> {
 
-    const url = new URL(request.url);
+      const url = new URL(request.url);
 
-    // ── [4] UA gate ──────────────────────────────────────────────────────────
-    if (isBlockedUA(request)) {
-      return new Response("Forbidden", { status: 403 });
-    }
-
-    // ── CORS origin resolution ────────────────────────────────────────────────
-    const corsOrigin = resolveCorsOrigin(request);
-
-    // ── OPTIONS pre-flight ────────────────────────────────────────────────────
-    if (request.method === "OPTIONS") {
-      const preflightHeaders = new Headers();
-      applySecurityHeaders(preflightHeaders, corsOrigin);
-      return new Response(null, { status: 204, headers: preflightHeaders });
-    }
-
-    // ── Route classification ──────────────────────────────────────────────────
-    const isVideo   = /\.(mp4|webm|mkv|avi|mov|m3u8|ts)$/i.test(url.pathname);
-    const isHLS     = url.pathname.endsWith(".m3u8");
-    const isSegment = url.pathname.endsWith(".ts");
-
-    // ── [2] CF fetch config — scrapeShield ENABLED ───────────────────────────
-    const cfConfig = {
-      cf: {
-        cacheEverything:    true,
-        cacheTtl:           isHLS ? 0 : isVideo ? 86400 : 3600,
-        cacheTtlByStatus: {
-          "200-299": isHLS ? 0 : 86400,
-          "404":     60,
-          "500-599": 0,
-        },
-        polish:  "lossless" as const,
-        mirage:  true,
-        minify: {
-          javascript: !isVideo,
-          css:        !isVideo,
-          html:       !isVideo,
-        },
-        scrapeShield: true,           // [2] was: false
-      },
-    };
-
-    try {
-      const originResponse = await fetch(request, cfConfig);
-      const headers        = new Headers(originResponse.headers);
-
-      // ── [1][5][6] Security headers ─────────────────────────────────────────
-      applySecurityHeaders(headers, corsOrigin);
-
-      // ── Video / segment streaming ──────────────────────────────────────────
-      if (isVideo || isSegment) {
-        headers.set("Accept-Ranges",     "bytes");
-        headers.set("Cache-Control",     "public, max-age=86400, stale-while-revalidate=3600");
-        headers.set("CDN-Cache-Control", "max-age=86400");
+      // ── [FIX-6] UA Gate ───────────────────────────────────────────────────
+      if (isBlockedUA(request)) {
+        return new Response("Forbidden", { status: 403 });
       }
 
-      // ── HLS manifest — must never cache ───────────────────────────────────
-      if (isHLS) {
-        headers.set("Cache-Control", "no-cache, no-store");
-        headers.set("Content-Type",  "application/vnd.apple.mpegurl");
+      // ── [FIX-9] Rate Limiting ─────────────────────────────────────────────
+      if (await isRateLimited(request, env)) {
+        return new Response("Too Many Requests", {
+          status: 429,
+          headers: { "Retry-After": "60" },
+        });
       }
 
-      // ── [3] Prefetch next segment — sanitised ──────────────────────────────
-      if (isSegment) {
-        const linkValue = buildNextSegmentLink(url.pathname);
-        if (linkValue) {
-          headers.set("Link", linkValue);
+      // ── CORS Origin Resolution ────────────────────────────────────────────
+      const corsOrigin = resolveCorsOrigin(request);
+
+      // ── OPTIONS Preflight ─────────────────────────────────────────────────
+      if (request.method === "OPTIONS") {
+        const preflightHeaders = new Headers();
+        applySecurityHeaders(preflightHeaders, corsOrigin);
+        return new Response(null, { status: 204, headers: preflightHeaders });
+      }
+
+      // ── Route Classification ──────────────────────────────────────────────
+      const isVideo   = /\.(mp4|webm|mkv|avi|mov|m3u8|ts)$/i.test(url.pathname);
+      const isHLS     = url.pathname.endsWith(".m3u8");
+      const isSegment = url.pathname.endsWith(".ts");
+
+      // ── CF Fetch Config ───────────────────────────────────────────────────
+      const cfConfig = {
+        cf: {
+          cacheEverything: true,
+          cacheTtl:        isHLS ? 0 : isVideo ? 86400 : 3600,
+          cacheTtlByStatus: {
+            "200-299": isHLS ? 0 : 86400,
+            "404":     60,
+            "500-599": 0,
+          },
+          polish:  "lossless" as const,
+          mirage:  true,
+          minify: {
+            javascript: !isVideo,
+            css:        !isVideo,
+            html:       !isVideo,
+          },
+          scrapeShield: true,
+        },
+      };
+
+      try {
+        const originResponse = await fetch(request, cfConfig);
+        const headers        = new Headers(originResponse.headers);
+
+        // ── Security Headers ──────────────────────────────────────────────
+        applySecurityHeaders(headers, corsOrigin);
+
+        // ── Video / Segment Streaming ─────────────────────────────────────
+        if (isVideo || isSegment) {
+          headers.set("Accept-Ranges",     "bytes");
+          headers.set("Cache-Control",     "public, max-age=86400, stale-while-revalidate=3600");
+          headers.set("CDN-Cache-Control", "max-age=86400");
         }
-        // Validation failure → header silently omitted; no injection possible.
+
+        // ── HLS Manifest — No Cache ───────────────────────────────────────
+        if (isHLS) {
+          headers.set("Cache-Control", "no-cache, no-store");
+          headers.set("Content-Type",  "application/vnd.apple.mpegurl");
+        }
+
+        // ── Prefetch Next Segment ─────────────────────────────────────────
+        if (isSegment) {
+          const linkValue = buildNextSegmentLink(url.pathname);
+          if (linkValue) {
+            headers.set("Link", linkValue);
+          }
+        }
+
+        return new Response(originResponse.body, {
+          status:     originResponse.status,
+          statusText: originResponse.statusText,
+          headers,
+        });
+
+      } catch (err) {
+        // [FIX-3] Report ទៅ Sentry ជាប្រចាំ
+        Sentry.captureException(err, {
+          tags: {
+            url:         url.pathname,
+            environment: env.ENVIRONMENT,
+            version:     env.APP_VERSION,
+          },
+        });
+
+        return new Response("Service Unavailable", {
+          status: 503,
+          headers: {
+            "Content-Type": "text/plain",
+            "Retry-After":  "30",
+          },
+        });
       }
-
-      return new Response(originResponse.body, {
-        status:     originResponse.status,
-        statusText: originResponse.statusText,
-        headers,
-      });
-
-    } catch (_err) {
-      return new Response("Service Unavailable", {
-        status: 503,
-        headers: {
-          "Content-Type": "text/plain",
-          "Retry-After":  "30",
-        },
-      });
-    }
-    }
+    },
   }
 );
-  
