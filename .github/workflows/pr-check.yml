@@ -1,83 +1,140 @@
+# ============================================================
+# FWG-UltraEdge — PR Check Workflow
+# 🔐 SECURITY HARDENED — FWG White-Hat Audit v5.0
+# ============================================================
+
 name: "FWG-UltraEdge PR Check"
+
 on:
   pull_request:
     branches:
       - main
       - develop
+
 permissions:
-  contents: read
-  actions: read
+  contents:      read
+  actions:       read
   pull-requests: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 env:
-  BUN_VERSION: latest
+  BUN_VERSION: "1.3.14"
+  NODE_VERSION: "24.2.0"
+
 jobs:
   secret-scanning:
     name: "🔐 Job 1 · Secret Scanning"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
   code-quality:
     name: "🎨 Job 2 · Code Quality"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: secret-scanning
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - run: bun install
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lockb') }}
+      - run: bun install --frozen-lockfile
       - run: bun x eslint . --ext .ts,.tsx --max-warnings 0
       - run: bun x prettier --check "src/**/*.{ts,tsx,json}"
+
   static-analysis:
     name: "🔬 Job 3 · Static Analysis"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: secret-scanning
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - run: bun install
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lockb') }}
+      - run: bun install --frozen-lockfile
       - run: bun x tsc --noEmit --strict
+
   ultra-fast-testing:
     name: "⚡ Job 4 · Unit Tests"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [code-quality, static-analysis]
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - run: bun install
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lockb') }}
+      - run: bun install --frozen-lockfile
       - run: bun test --coverage
         env:
           NODE_ENV: test
+
   security-audit-pr:
     name: "🛡️ Job 5 · Security Audit"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: secret-scanning
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - run: bun install
-      - run: bun audit --audit-level=high || true
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lockb') }}
+      - run: bun install --frozen-lockfile
+      - name: Audit critical & high (pipeline blocker)
+        run: bun audit --audit-level=high
+      - name: Audit moderate (warning only)
+        run: bun audit --audit-level=moderate || true
+        continue-on-error: true
+
   pr-comment:
     name: "💬 Job 6 · PR Comment"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [ultra-fast-testing, security-audit-pr]
     if: always()
+    permissions:
+      pull-requests: write
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -85,21 +142,33 @@ jobs:
             const audit = '${{ needs.security-audit-pr.result }}';
             const ok    = test === 'success' && audit === 'success';
             const url   = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            const body  = `## ${ok ? '✅' : '❌'} FWG-UltraEdge 🌍⚡ PR Check\n\n| Check | Status |\n|-------|--------|\n| ⚡ Tests | ${test === 'success' ? '✅' : '❌'} |\n| 🛡️ Audit | ${audit === 'success' ? '✅' : '❌'} |\n\n[View Run](${url})`;
+            const body  = [
+              `## ${ok ? '✅' : '❌'} FWG-UltraEdge 🌍⚡ PR Check`,
+              '',
+              '| Check | Status |',
+              '|-------|--------|',
+              `| ⚡ Tests | ${test === 'success' ? '✅ Passed' : '❌ Failed'} |`,
+              `| 🛡️ Audit | ${audit === 'success' ? '✅ Passed' : '❌ Failed'} |`,
+              '',
+              `[View Run](${url})`
+            ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
-              repo: context.repo.repo,
+              repo:  context.repo.repo,
               issue_number: context.issue.number,
               body
             });
+
   pr-notify-failure:
     name: "🔔 Job 7 · Slack Alert"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [secret-scanning, code-quality, static-analysis, ultra-fast-testing, security-audit-pr]
     if: failure()
     steps:
+      - name: Mask sensitive values
+        run: echo "::add-mask::${{ secrets.SLACK_WEBHOOK_URL }}"
       - name: Alert Slack
         run: |
           curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
-            -d "{\"text\":\"❌ FWG-UltraEdge PR Check FAILED 🌍⚡\nBranch: \`${{ github.head_ref }}\`\nAuthor: ${{ github.actor }}\"}"
+            -d "{\"attachments\":[{\"color\":\"danger\",\"title\":\"❌ FWG-UltraEdge PR FAILED 🌍⚡\",\"fields\":[{\"title\":\"Branch\",\"value\":\"\`${{ github.head_ref }}\`\",\"short\":true},{\"title\":\"Author\",\"value\":\"${{ github.actor }}\",\"short\":true}]}]}"
