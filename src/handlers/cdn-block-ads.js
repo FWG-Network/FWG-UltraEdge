@@ -1,8 +1,38 @@
+// FWG-UltraEdge 🌍⚡ — PAC File (cdn-block-ads.js)
+// 🔐 SECURITY HARDENED — FWG White-Hat Audit v5.0
+// Fixes:
+//   [FIX-11] SOCKS5 fallback → DIRECT added
+//            prevents traffic leak if SOCKS5 down
+
 function FindProxyForURL(url, host) {
     var ip = dnsResolve(host);
 
     // =========================
-    // 🔒 BLOCK - Malware / Tracking
+    // 🟢 1. LOCAL / PRIVATE NETWORKS → DIRECT
+    // =========================
+    if (
+        isPlainHostName(host)              ||
+        shExpMatch(host, "localhost")      ||
+        shExpMatch(host, "127.*")          ||
+        shExpMatch(host, "192.168.*")      ||
+        shExpMatch(host, "10.*")           ||
+        shExpMatch(host, "172.16.*")       ||
+        shExpMatch(host, "172.17.*")       ||
+        shExpMatch(host, "172.18.*")       ||
+        shExpMatch(host, "172.19.*")       ||
+        shExpMatch(host, "172.2*.*")       ||
+        shExpMatch(host, "172.30.*")       ||
+        shExpMatch(host, "172.31.*")       ||
+        isInNet(ip, "127.0.0.1",   "255.0.0.0")   ||
+        isInNet(ip, "10.0.0.0",    "255.0.0.0")   ||
+        isInNet(ip, "172.16.0.0",  "255.240.0.0") ||
+        isInNet(ip, "192.168.0.0", "255.255.0.0")
+    ) {
+        return "DIRECT";
+    }
+
+    // =========================
+    // 🔒 2. BLOCK - Ads / Tracking / Malware
     // =========================
     if (
         // === Ads Networks ===
@@ -82,51 +112,55 @@ function FindProxyForURL(url, host) {
         dnsDomainIs(host, ".tiktokv.com")           ||
         dnsDomainIs(host, ".byteoversea.com")
     ) {
-        return "PROXY 127.0.0.1:1"; // ← Drop connection
+        return "PROXY 127.0.0.1:1"; // Drop connection
     }
 
     // =========================
-    // ⚡ DIRECT - CDN / Trusted
+    // ⚡ 3. DIRECT - CDN / Trusted
     // =========================
     if (
         // === YouTube ===
-        dnsDomainIs(host, ".youtube.com")                        ||
-        dnsDomainIs(host, ".googlevideo.com")                    ||
-        dnsDomainIs(host, ".ytimg.com")                         ||
-        host == "youtu.be"                                       ||
+        dnsDomainIs(host, ".youtube.com")       ||
+        dnsDomainIs(host, ".googlevideo.com")   ||
+        dnsDomainIs(host, ".ytimg.com")         ||
+        host == "youtu.be"                      ||
         // === CDN Providers ===
-        dnsDomainIs(host, ".cloudflare.com")                     ||
-        dnsDomainIs(host, ".cloudfront.net")                     ||
-        dnsDomainIs(host, ".fastly.net")                         ||
-        dnsDomainIs(host, ".akamaiedge.net")                     ||
-        dnsDomainIs(host, ".akamai.net")                         ||
-        dnsDomainIs(host, ".edgesuite.net")                      ||
-        dnsDomainIs(host, ".azureedge.net")                      ||
-        dnsDomainIs(host, ".azurefd.net")                        ||
+        dnsDomainIs(host, ".cloudflare.com")    ||
+        dnsDomainIs(host, ".cloudfront.net")    ||
+        dnsDomainIs(host, ".fastly.net")        ||
+        dnsDomainIs(host, ".akamaiedge.net")    ||
+        dnsDomainIs(host, ".akamai.net")        ||
+        dnsDomainIs(host, ".edgesuite.net")     ||
+        dnsDomainIs(host, ".azureedge.net")     ||
+        dnsDomainIs(host, ".azurefd.net")       ||
         // === JS/CSS Libraries ===
-        dnsDomainIs(host, ".unpkg.com")                          ||
-        dnsDomainIs(host, ".cdn.jsdelivr.net")                   ||
-        dnsDomainIs(host, ".bootstrapcdn.com")                   ||
+        dnsDomainIs(host, ".unpkg.com")         ||
+        dnsDomainIs(host, ".cdn.jsdelivr.net")  ||
+        dnsDomainIs(host, ".bootstrapcdn.com")  ||
         // === Google ===
-        dnsDomainIs(host, ".googleapis.com")                     ||
-        dnsDomainIs(host, ".fonts.googleapis.com")               ||
-        dnsDomainIs(host, ".gstatic.com")                        ||
-        dnsDomainIs(host, ".ggpht.com")                         ||
+        dnsDomainIs(host, ".googleapis.com")    ||
+        dnsDomainIs(host, ".gstatic.com")       ||
+        dnsDomainIs(host, ".ggpht.com")         ||
         // === AWS ===
-        dnsDomainIs(host, ".amazonaws.com")                      ||
+        dnsDomainIs(host, ".amazonaws.com")     ||
         // === CacheFly ===
-        dnsDomainIs(host, ".cachefly.net")                       ||
+        dnsDomainIs(host, ".cachefly.net")      ||
         // === Government / Education ===
-        shExpMatch(host, "*.gov.*")                              ||
+        shExpMatch(host, "*.gov.*")             ||
         shExpMatch(host, "*.edu.*")
     ) {
         return "DIRECT";
     }
 
     // =========================
-    // 🔐 ALL OTHER - Force thru Privacy Proxy
+    // 🔐 4. ALL OTHER → Privacy Proxy
+    // [FIX-11] DIRECT fallback added — prevent traffic leak
+    //          if SOCKS5 proxy is down
     // =========================
-    return "SOCKS5 127.0.0.1:9050; SOCKS 127.0.0.1:9050";
-    // return "PROXY 127.0.0.1:8080";
-    // return "SOCKS5 127.0.0.1:9050; PROXY 127.0.0.1:8080; DIRECT";
+    return (
+        "HTTPS ultraedge-prod.fasterwgseverkh.workers.dev:443; " +
+        "HTTPS ultraedge-stg.fasterwgseverkh.workers.dev:443; " +
+        "SOCKS5 127.0.0.1:9050; " +
+        "DIRECT"
+    );
 }
