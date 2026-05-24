@@ -117,7 +117,7 @@ class_name = "SmartRouter"
 # ════════════════════════════════════════════════════════════
 [env.production]
 name                = "ultraedge-prod"
-workers_dev         = false  # ✅
+workers_dev         = true  # ✅
 compatibility_date  = "2026-05-23"
 compatibility_flags = ["nodejs_compat"]
 
