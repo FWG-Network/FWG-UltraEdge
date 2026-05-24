@@ -1,25 +1,78 @@
+# ============================================================
+# FWG-UltraEdge — Nightly Security Audit
+# 🔐 SECURITY HARDENED — FWG White-Hat Audit v5.0
+# ============================================================
+
 name: "FWG-UltraEdge Nightly Audit"
+
 on:
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
+
 permissions:
   contents: read
+
+env:
+  BUN_VERSION:         "1.3.14"
+  OSV_SCANNER_VERSION: "2.3.5"
+
 jobs:
   nightly-audit:
     name: "🛡️ Nightly Security Audit"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5
         with:
-          bun-version: latest
-      - run: bun install
-      - name: Run audit
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lockb') }}
+      - run: bun install --frozen-lockfile
+      - name: Audit CRITICAL & HIGH (hard fail)
+        run: bun audit --audit-level=high
+      - name: Audit moderate (warning)
         run: bun audit --audit-level=moderate || true
-      - name: Notify Slack on failure
+        continue-on-error: true
+      - name: Install OSV Scanner V2
+        run: |
+          OSV_VERSION="${{ env.OSV_SCANNER_VERSION }}"
+          BASE_URL="https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}"
+          BINARY_FILE="osv-scanner_linux_amd64"
+          wget -q "${BASE_URL}/${BINARY_FILE}" -O /tmp/osv-scanner
+          wget -q "${BASE_URL}/${BINARY_FILE}.sha256" -O /tmp/osv-scanner.sha256
+          EXPECTED_HASH=$(awk '{print $1}' /tmp/osv-scanner.sha256)
+          echo "${EXPECTED_HASH}  /tmp/osv-scanner" | sha256sum --check --strict
+          chmod +x /tmp/osv-scanner
+          sudo mv /tmp/osv-scanner /usr/local/bin/osv-scanner
+      - name: Run OSV Scanner V2
+        run: |
+          set -euo pipefail
+          osv-scanner scan --lockfile=bun.lockb --format=json --output=osv-results.json . || true
+          CRITICAL_COUNT=$(jq '[.results[]?.packages[]?.vulnerabilities[]?
+            | select((.database_specific.severity // "" | ascii_upcase) == "CRITICAL")
+          ] | length' osv-results.json 2>/dev/null || echo "0")
+          HIGH_COUNT=$(jq '[.results[]?.packages[]?.vulnerabilities[]?
+            | select((.database_specific.severity // "" | ascii_upcase) == "HIGH")
+          ] | length' osv-results.json 2>/dev/null || echo "0")
+          echo "🔴 CRITICAL: ${CRITICAL_COUNT} | 🟠 HIGH: ${HIGH_COUNT}"
+          [ "${CRITICAL_COUNT}" -gt 0 ] || [ "${HIGH_COUNT}" -gt 0 ] && exit 1 || echo "✅ Clean"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: nightly-osv-${{ github.run_id }}
+          path: osv-results.json
+          retention-days: 30
+      - name: Mask & Notify Slack
         if: failure()
         run: |
+          echo "::add-mask::${{ secrets.SLACK_WEBHOOK_URL }}"
           curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
-            -d "{\"text\":\"🚨 FWG-UltraEdge Nightly Audit FAILED! 🌍⚡\"}"
+            -d "{\"attachments\":[{\"color\":\"danger\",\"title\":\"🚨 Nightly Audit FAILED! 🌍⚡\",\"fields\":[{\"title\":\"Date\",\"value\":\"$(date -u '+%Y-%m-%d')\"}]}]}"
