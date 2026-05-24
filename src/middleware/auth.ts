@@ -1,5 +1,11 @@
 // FWG-UltraEdge 🌍⚡ — Auth Middleware
 // Version: 3.0.0 | Bearer Token + HMAC Verification
+// 🔐 SECURITY HARDENED — FWG White-Hat Audit v5.0
+// Fixes:
+//   [FIX-1] path leakage → minimal error response
+//   [FIX-2] X-Powered-By → removed
+//   [FIX-3] /api/config removed from PUBLIC_PATHS
+//   [FIX-4] AUTH_SECRET fallback chain → strict single secret
 
 import type { Env } from "../types/env";
 
@@ -21,7 +27,8 @@ function extractBearer(req: Request): string | null {
 }
 
 // ── Public routes (no auth required) ──
-const PUBLIC_PATHS = new Set(["/health", "/api/config"]);
+// [FIX-3] /api/config removed — it leaks version + environment info
+const PUBLIC_PATHS = new Set(["/health"]);
 
 export function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.has(pathname);
@@ -43,38 +50,36 @@ export async function withAuth(
   const token = extractBearer(req);
 
   if (!token) {
+    // [FIX-1] Minimal error — no path, no stack info
+    // [FIX-2] X-Powered-By removed
     return Response.json(
-      {
-        error: "Unauthorized",
-        message: "Missing Bearer token",
-        path: url.pathname,
-      },
+      { error: "Unauthorized" },
       {
         status: 401,
         headers: {
           "WWW-Authenticate": 'Bearer realm="FWG-UltraEdge"',
-          "X-Powered-By": "FWG-UltraEdge 🌍⚡",
         },
       }
     );
   }
 
-  // ── Validate token ──
-  const secret = env.AUTH_SECRET ?? env.HEALTH_CHECK_TOKEN ?? "";
-
-  if (!secret || !safeCompare(token, secret)) {
+  // ── [FIX-4] Strict single secret — no fallback chain ──
+  // Fallback chain (AUTH_SECRET ?? HEALTH_CHECK_TOKEN) allows
+  // the weaker token to authenticate — removed entirely.
+  const secret = env.AUTH_SECRET ?? "";
+  if (!secret) {
+    // Misconfigured — fail closed, never fail open
     return Response.json(
-      {
-        error: "Forbidden",
-        message: "Invalid token",
-        path: url.pathname,
-      },
-      {
-        status: 403,
-        headers: {
-          "X-Powered-By": "FWG-UltraEdge 🌍⚡",
-        },
-      }
+      { error: "Service Unavailable" },
+      { status: 503 }
+    );
+  }
+
+  if (!safeCompare(token, secret)) {
+    // [FIX-1] Minimal error — no path leaked
+    return Response.json(
+      { error: "Forbidden" },
+      { status: 403 }
     );
   }
 
@@ -83,7 +88,7 @@ export async function withAuth(
     headers: (() => {
       const h = new Headers(req.headers);
       h.set("X-Auth-Verified", "true");
-      h.set("X-Auth-Time", new Date().toISOString());
+      h.set("X-Auth-Time",     new Date().toISOString());
       return h;
     })(),
   });
@@ -92,8 +97,9 @@ export async function withAuth(
 }
 
 // ── Health check token validator ──
+// Uses dedicated HEALTH_CHECK_TOKEN — separate from AUTH_SECRET
 export function validateHealthToken(req: Request, env: Env): boolean {
-  const token = extractBearer(req);
+  const token    = extractBearer(req);
   const expected = env.HEALTH_CHECK_TOKEN ?? "";
   if (!token || !expected) return false;
   return safeCompare(token, expected);
