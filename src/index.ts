@@ -1,30 +1,34 @@
 /**
  * FWG-UltraEdge — Cloudflare Worker
  * ============================================================
- * 🔐 SECURITY HARDENED — FWG White-Hat Audit v4.0
+ * 🔐 SECURITY HARDENED — FWG White-Hat Audit v5.0
+ * 🎬 VIDEO QUALITY — HD Resolution Fix
  * Fixes:
- *   [FIX-1] SENTRY_DSN hardcode → env.SENTRY_DSN (secret)
- *   [FIX-2] tracesSampleRate 1.0 → 0.1 នៅ production
- *   [FIX-3] catch block → Sentry.captureException
- *   [FIX-4] Env interface ពេញលេញ
- *   [FIX-5] CORS allowlist — explicit origins
- *   [FIX-6] UA blocking — hardened regex
- *   [FIX-7] Path sanitisation — CRLF injection prevention
- *   [FIX-8] Security headers ពេញលេញ
- *   [FIX-9] Rate limiting via KV
+ *   [FIX-1]  SENTRY_DSN → env.SENTRY_DSN (secret)
+ *   [FIX-2]  tracesSampleRate → 0.1 production
+ *   [FIX-3]  catch → Sentry.captureException
+ *   [FIX-4]  Env interface ពេញលេញ
+ *   [FIX-5]  CORS — :443 removed from origins
+ *   [FIX-6]  UA blocking hardened
+ *   [FIX-7]  Path sanitisation
+ *   [FIX-8]  Security headers
+ *   [FIX-9]  Rate limiting via KV
+ *   [FIX-10] polish: "off" for video — prevent quality loss
+ *   [FIX-11] mirage: false for video — prevent resize
+ *   [FIX-12] minify: off for video + segments
+ *   [FIX-13] Content-Type headers for video formats
  * ============================================================
  */
 
 import { withSentry } from "@sentry/cloudflare";
-import * as Sentry from "@sentry/cloudflare";
+import * as Sentry    from "@sentry/cloudflare";
 
 // ─── Env Interface ────────────────────────────────────────────────────────────
-// Bindings ទាំងអស់ត្រូវប្រកាសនៅទីនេះ
 export interface Env {
   // 🔐 Secrets (wrangler secret put)
-  SENTRY_DSN:        string;
-  CF_CLIENT_ID:      string;
-  CF_CLIENT_SECRET:  string;
+  SENTRY_DSN:       string;
+  CF_CLIENT_ID:     string;
+  CF_CLIENT_SECRET: string;
 
   // KV / R2 / Durable Objects
   ULTRA_EDGE_KV:     KVNamespace;
@@ -32,17 +36,16 @@ export interface Env {
   SMART_ROUTER:      DurableObjectNamespace;
 
   // Vars (wrangler.toml [vars])
-  ENVIRONMENT:  string;
-  APP_NAME:     string;
-  APP_VERSION:  string;
+  ENVIRONMENT: string;
+  APP_NAME:    string;
+  APP_VERSION: string;
 }
 
 // ─── [FIX-5] CORS Allowlist ───────────────────────────────────────────────────
-// ប្រើ explicit origins — កុំ "*" ឡើយ!
+// [FIX-5] :443 removed — browsers never include port in HTTPS Origin header
 const ALLOWED_ORIGINS = new Set<string>([
-  "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",
-  "https://ultraedge-stg.fasterwgseverkh.workers.dev/:443",
-  // បន្ថែម custom domain នៅទីនេះ បើមាន
+  "https://ultraedge-prod.fasterwgseverkh.workers.dev",
+  "https://ultraedge-stg.fasterwgseverkh.workers.dev",
   // "https://fwg.yourdomain.com",
 ]);
 
@@ -63,10 +66,10 @@ function buildNextSegmentLink(pathname: string): string | null {
   const nextIndex = parseInt(numStr, 10) + 1;
   const nextPath  = `${dir}${nextIndex}.ts`;
 
-  if (!SAFE_PATH_RE.test(nextPath))                        return null;
-  if (nextPath.includes("://"))                            return null;
-  if (nextPath.startsWith("//"))                           return null;
-  if (nextPath.includes("\n") || nextPath.includes("\r"))  return null;
+  if (!SAFE_PATH_RE.test(nextPath))                       return null;
+  if (nextPath.includes("://"))                           return null;
+  if (nextPath.startsWith("//"))                          return null;
+  if (nextPath.includes("\n") || nextPath.includes("\r")) return null;
 
   return `<${nextPath}>; rel=prefetch`;
 }
@@ -83,23 +86,35 @@ function isBlockedUA(request: Request): boolean {
 // ─── [FIX-9] Rate Limiting via KV ────────────────────────────────────────────
 async function isRateLimited(request: Request, env: Env): Promise<boolean> {
   try {
-    const ip  = request.headers.get("CF-Connecting-IP") ?? "unknown";
-    const key = `ratelimit:${ip}`;
+    const ip      = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const key     = `ratelimit:${ip}`;
     const current = parseInt((await env.ULTRA_EDGE_KV.get(key)) ?? "0");
-    if (current > 100) return true; // 100 req/min
+    if (current > 100) return true;
     await env.ULTRA_EDGE_KV.put(key, String(current + 1), {
       expirationTtl: 60,
     });
     return false;
   } catch {
-    // បើ KV error → មិន block traffic
     return false;
   }
 }
 
-// ─── [FIX-8] Security Headers ────────────────────────────────────────────────
-function applySecurityHeaders(headers: Headers, corsOrigin: string | null): void {
+// ─── [FIX-13] Video Content-Type Detection ───────────────────────────────────
+function detectVideoContentType(pathname: string): string | null {
+  if (pathname.endsWith(".mp4"))  return "video/mp4";
+  if (pathname.endsWith(".webm")) return "video/webm";
+  if (pathname.endsWith(".ts"))   return "video/mp2t";
+  if (pathname.endsWith(".mkv"))  return "video/x-matroska";
+  if (pathname.endsWith(".avi"))  return "video/x-msvideo";
+  if (pathname.endsWith(".mov"))  return "video/quicktime";
+  return null;
+}
 
+// ─── [FIX-8] Security Headers ────────────────────────────────────────────────
+function applySecurityHeaders(
+  headers:    Headers,
+  corsOrigin: string | null
+): void {
   // CORS
   if (corsOrigin) {
     headers.set("Access-Control-Allow-Origin",  corsOrigin);
@@ -114,13 +129,9 @@ function applySecurityHeaders(headers: Headers, corsOrigin: string | null): void
     "max-age=63072000; includeSubDomains; preload");
 
   // Clickjacking
-  headers.set("X-Frame-Options", "DENY");
-
-  // MIME sniffing
+  headers.set("X-Frame-Options",        "DENY");
   headers.set("X-Content-Type-Options", "nosniff");
-
-  // Referrer
-  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Referrer-Policy",        "strict-origin-when-cross-origin");
 
   // CSP
   headers.set("Content-Security-Policy", [
@@ -153,37 +164,35 @@ function applySecurityHeaders(headers: Headers, corsOrigin: string | null): void
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 export default withSentry(
-  // [FIX-1] SENTRY_DSN ពី secret — មិន hardcode!
   (env: Env) => ({
-    dsn: env.SENTRY_DSN,
-    // [FIX-2] tracesSampleRate — 10% production, 100% staging
+    dsn:              env.SENTRY_DSN,
     tracesSampleRate: env.ENVIRONMENT === "production" ? 0.1 : 1.0,
-    environment: env.ENVIRONMENT,
-    release: env.APP_VERSION,
+    environment:      env.ENVIRONMENT,
+    release:          env.APP_VERSION,
   }),
   {
     async fetch(
       request: Request,
-      env: Env,
-      _ctx: ExecutionContext,
+      env:     Env,
+      _ctx:    ExecutionContext,
     ): Promise<Response> {
 
       const url = new URL(request.url);
 
-      // ── [FIX-6] UA Gate ───────────────────────────────────────────────────
+      // ── UA Gate ───────────────────────────────────────────────────────────
       if (isBlockedUA(request)) {
         return new Response("Forbidden", { status: 403 });
       }
 
-      // ── [FIX-9] Rate Limiting ─────────────────────────────────────────────
+      // ── Rate Limiting ─────────────────────────────────────────────────────
       if (await isRateLimited(request, env)) {
         return new Response("Too Many Requests", {
-          status: 429,
+          status:  429,
           headers: { "Retry-After": "60" },
         });
       }
 
-      // ── CORS Origin Resolution ────────────────────────────────────────────
+      // ── CORS ──────────────────────────────────────────────────────────────
       const corsOrigin = resolveCorsOrigin(request);
 
       // ── OPTIONS Preflight ─────────────────────────────────────────────────
@@ -208,13 +217,25 @@ export default withSentry(
             "404":     60,
             "500-599": 0,
           },
-          polish:  "lossless" as const,
-          mirage:  true,
+
+          // [FIX-10] polish OFF for video — prevent compression/quality loss
+          // polish on video = bytes corrupted = blurry/pixelated!
+          polish: isVideo || isSegment
+            ? "off" as const
+            : "lossless" as const,
+
+          // [FIX-11] mirage OFF for video — prevent lazy load/resize
+          // mirage on video = resolution downscaled = blurry!
+          mirage: !(isVideo || isSegment),
+
+          // [FIX-12] minify OFF for video + segments
+          // minify on video bytes = corrupt stream!
           minify: {
-            javascript: !isVideo,
-            css:        !isVideo,
-            html:       !isVideo,
+            javascript: !isVideo && !isSegment,
+            css:        !isVideo && !isSegment,
+            html:       !isVideo && !isSegment,
           },
+
           scrapeShield: true,
         },
       };
@@ -231,6 +252,13 @@ export default withSentry(
           headers.set("Accept-Ranges",     "bytes");
           headers.set("Cache-Control",     "public, max-age=86400, stale-while-revalidate=3600");
           headers.set("CDN-Cache-Control", "max-age=86400");
+
+          // [FIX-13] Set correct Content-Type for each video format
+          // Missing Content-Type = browser guesses = quality issues!
+          const contentType = detectVideoContentType(url.pathname);
+          if (contentType && !headers.get("Content-Type")) {
+            headers.set("Content-Type", contentType);
+          }
         }
 
         // ── HLS Manifest — No Cache ───────────────────────────────────────
@@ -242,9 +270,7 @@ export default withSentry(
         // ── Prefetch Next Segment ─────────────────────────────────────────
         if (isSegment) {
           const linkValue = buildNextSegmentLink(url.pathname);
-          if (linkValue) {
-            headers.set("Link", linkValue);
-          }
+          if (linkValue) headers.set("Link", linkValue);
         }
 
         return new Response(originResponse.body, {
@@ -254,7 +280,6 @@ export default withSentry(
         });
 
       } catch (err) {
-        // [FIX-3] Report ទៅ Sentry ជាប្រចាំ
         Sentry.captureException(err, {
           tags: {
             url:         url.pathname,
@@ -264,7 +289,7 @@ export default withSentry(
         });
 
         return new Response("Service Unavailable", {
-          status: 503,
+          status:  503,
           headers: {
             "Content-Type": "text/plain",
             "Retry-After":  "30",
