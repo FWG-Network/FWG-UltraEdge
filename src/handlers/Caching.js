@@ -1,26 +1,47 @@
-export default {
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
+// FWG-UltraEdge 🌍⚡ — Caching Handler
+// 🔐 SECURITY HARDENED — FWG White-Hat Audit v5.0
+// Fixes:
+//   [FIX-9]  Error → Sentry report + proper status
+//   [FIX-10] cacheEverything → GET only
 
-    // ១. កំណត់ Logic សម្រាប់ Edge Caching បែបងាយ (Smooth & Fast)
+import * as Sentry from "@sentry/cloudflare";
+
+export default {
+  async fetch(request, env, ctx) {
+
+    // [FIX-10] Cache GET requests only
+    // POST/PUT/DELETE must never be cached
     const cf = {
       cf: {
-        cacheEverything: true,      // Caching គ្រប់យ៉ាងដើម្បីឱ្យដើរ Smooth
-        cacheTtl: 3600,             // រក្សាក្នុង Edge រយៈពេល ១ ម៉ោង
-        minify: { javascript: true, css: true, html: true } // បង្រួមកូដឱ្យស្រាល
-      }
+        cacheEverything: request.method === "GET",
+        cacheTtl:        request.method === "GET" ? 3600 : 0,
+        minify: {
+          javascript: true,
+          css:        true,
+          html:       true,
+        },
+      },
     };
 
-    // ២. Fetch ទៅកាន់ Origin (វេបសាយមេ) ដោយប្រើ Logic ខាងលើ
     try {
       const response = await fetch(request.url, cf);
-      
-      // បង្កើត Response ថ្មីដើម្បីកុំឱ្យជាប់បញ្ហា Header ពី Host ចាស់
       return new Response(response.body, response);
-      
-    } catch (e) {
-      // បើមានបញ្ហា (ដូចជា Status 500) ឱ្យវាប្រាប់យើងខ្លីៗ
-      return new Response("Worker Error", { status: 500 });
+
+    } catch (err) {
+      // [FIX-9] Report to Sentry + proper 503
+      Sentry.captureException(err, {
+        tags: {
+          handler:     "Caching",
+          url:         request.url,
+          method:      request.method,
+          environment: env?.ENVIRONMENT ?? "unknown",
+        },
+      });
+
+      return new Response("Service Unavailable", {
+        status:  503,
+        headers: { "Retry-After": "30" },
+      });
     }
-  }
+  },
 };
