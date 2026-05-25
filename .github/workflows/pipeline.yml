@@ -771,8 +771,8 @@ jobs:
       - name: Verify artifact integrity before production deploy
         run: |
           set -euo pipefail
-          FILENAME="${{ needs.build-artifacts.outputs.artifact-filename }}"
-          EXPECTED_B64="${{ needs.build-artifacts.outputs.artifact-sha256 }}"
+          FILENAME= "${{ needs.build-artifacts.outputs.artifact-filename }}"
+          EXPECTED_B64= "${{ needs.build-artifacts.outputs.artifact-sha256 }}"
           DECODED=$(echo "${EXPECTED_B64}" | base64 -d)
           EXPECTED_HASH=$(echo "${DECODED}" | awk '{print $1}')
           ACTUAL_HASH=$(sha256sum "${FILENAME}" | awk '{print $1}')
