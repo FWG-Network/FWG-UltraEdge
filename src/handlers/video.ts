@@ -14,7 +14,7 @@ import {
 // ── [FIX-8] Allowed VIDEO_ORIGIN values ──
 const ALLOWED_VIDEO_ORIGINS = new Set([
   "https://cdn.ultraedge-prod.fasterwgseverkh.workers.dev",
-  "https://stream.ultraedge-prod.fasterwgseverkh.workers.dev",
+  "https://stream.ultraedge-prod.fasterwgseverkh.workers.dev/:443",
   // បន្ថែម origins ត្រឹមត្រូវនៅទីនេះ
 ]);
 
