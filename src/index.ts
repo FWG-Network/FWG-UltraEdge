@@ -1,5 +1,4 @@
 import { withSentry } from "@sentry/cloudflare";
-import * as Sentry    from "@sentry/cloudflare";
 
 /**
  * FWG-UltraEdge — Cloudflare Worker
