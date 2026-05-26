@@ -12,7 +12,7 @@ const ALLOWED_ORIGINS = new Set<string>([
   // Production
   "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",
   "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev/:443",
-  "https://cdn-ultraedge-stg.fasterwgseverkh.workers.dev/:443",
+  "https://cdn-ultraedge-prod.fasterwgseverkh.workers.dev/:443",
 ]);
 
 function resolveCorsOrigin(req: Request): string {
