@@ -10,13 +10,13 @@ import type { Env } from "../types/env";
 // ─── [FIX-1] Allowed Origins (mirrors index.ts ALLOWED_ORIGINS) ──────────────
 const ALLOWED_ORIGINS = new Set<string>([
   // Production
-  "https://ultraedge-prod.fasterwgseverkh.workers.dev",
-  "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev",
-  "https://cdn-ultraedge-prod.fasterwgseverkh.workers.dev",
+  "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",
+  "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev/:443",
+  "https://cdn-ultraedge-prod.fasterwgseverkh.workers.dev/:443",
   // Staging
-  "https://ultraedge-stg.fasterwgseverkh.workers.dev",
-  "https://stream-ultraedge-stg.fasterwgseverkh.workers.dev",
-  "https://cdn-ultraedge-stg.fasterwgseverkh.workers.dev",
+  "https://ultraedge-stg.fasterwgseverkh.workers.dev/:443",
+  "https://stream-ultraedge-stg.fasterwgseverkh.workers.dev/:443",
+  "https://cdn-ultraedge-stg.fasterwgseverkh.workers.dev/:443",
 ]);
 
 function resolveCorsOrigin(req: Request): string {
