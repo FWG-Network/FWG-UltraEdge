@@ -50,6 +50,10 @@ export interface Env {
 
 // ─── [1] CORS allowlist ───────────────────────────────────────────────────────
 // [V5] :443 removed — browsers never include port in HTTPS Origin header
+// PAC file បន្ថែម ✅
+var ip = dnsResolve(host); 
+// host = "cdn-ultraedge-prod.fasterwgseverkh.workers.dev"
+// ip   = "104.21.x.x" (Cloudflare IP)
 const ALLOWED_ORIGINS = new Set<string>([
   // Production
   "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",
