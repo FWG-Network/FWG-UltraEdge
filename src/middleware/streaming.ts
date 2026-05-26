@@ -8,14 +8,11 @@
 import type { Env } from "../types/env";
 
 // ─── [FIX-1] Allowed Origins (mirrors index.ts ALLOWED_ORIGINS) ──────────────
-
-export async function streamR2Video(
-  req:         Request,
-  env:         Env,
-  filename:    string,
-  corsOrigin:  string  // ← receive ពី index.ts
-): Promise<Response> {
-  // ប្រើ corsOrigin ផ្ទាល់ — មិនត្រូវ resolve ម្តងទៀត
+const ALLOWED_ORIGINS = new Set<string>([
+  // Production
+  "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",  
+  "https://ultraedge-stg.fasterwgseverkh.workers.dev/:443",  
+]);
 
 function resolveCorsOrigin(req: Request): string {
   const origin = req.headers.get("Origin") ?? "";
