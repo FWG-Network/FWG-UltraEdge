@@ -1,7 +1,12 @@
 import { withSentry } from "@sentry/cloudflare";
+import * as Sentry    from "@sentry/cloudflare";
 
-/**
+/**                    ← បន្ថែមបន្ទាត់នេះ!
  * FWG-UltraEdge — Cloudflare Worker
+ * Security hardening applied:
+ ...
+ */
+
  * Security hardening applied:
  *   [1] CORS wildcard → explicit allowlist
  *   [2] scrapeShield: true preserved
