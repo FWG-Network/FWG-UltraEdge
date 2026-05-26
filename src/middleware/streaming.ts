@@ -7,6 +7,11 @@
 
 import type { Env } from "../types/env";
 
+// PAC file បន្ថែម ✅
+var ip = dnsResolve(host); 
+// host = "cdn-ultraedge-prod.fasterwgseverkh.workers.dev"
+// ip   = "104.21.x.x" (Cloudflare IP)
+
 // ─── [FIX-1] Allowed Origins (mirrors index.ts ALLOWED_ORIGINS) ──────────────
 const ALLOWED_ORIGINS = new Set<string>([
   // Production
