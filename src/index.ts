@@ -58,7 +58,6 @@ const ALLOWED_ORIGINS = new Set<string>([
   // Staging
   "https://ultraedge-stg.fasterwgseverkh.workers.dev/:443",
   "https://stream-ultraedge-stg.fasterwgseverkh.workers.dev/:443",
-  "https://cdn-ultraedge-stg.fasterwgseverkh.workers.dev/:443",
 ]);
 
 function resolveCorsOrigin(request: Request): string | null {
