@@ -10,8 +10,9 @@ import type { Env } from "../types/env";
 // ─── [FIX-1] Allowed Origins (mirrors index.ts ALLOWED_ORIGINS) ──────────────
 const ALLOWED_ORIGINS = new Set<string>([
   // Production
-  "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",  
-  "https://ultraedge-stg.fasterwgseverkh.workers.dev/:443",  
+  "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",
+  "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev/:443",
+  "https://cdn-ultraedge-prod.fasterwgseverkh.workers.dev/:443",
 ]);
 
 function resolveCorsOrigin(req: Request): string {
