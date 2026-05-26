@@ -51,9 +51,14 @@ export interface Env {
 // ─── [1] CORS allowlist ───────────────────────────────────────────────────────
 // [V5] :443 removed — browsers never include port in HTTPS Origin header
 const ALLOWED_ORIGINS = new Set<string>([
+  // Production
   "https://ultraedge-prod.fasterwgseverkh.workers.dev",
+  "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev",
+  "https://cdn-ultraedge-prod.fasterwgseverkh.workers.dev",
+  // Staging
   "https://ultraedge-stg.fasterwgseverkh.workers.dev",
-  // "https://fwg.yourdomain.com", ← add custom domain here
+  "https://stream-ultraedge-stg.fasterwgseverkh.workers.dev",
+  "https://cdn-ultraedge-stg.fasterwgseverkh.workers.dev",
 ]);
 
 function resolveCorsOrigin(request: Request): string | null {
