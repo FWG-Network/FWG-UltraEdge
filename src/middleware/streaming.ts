@@ -8,22 +8,14 @@
 import type { Env } from "../types/env";
 
 // ─── [FIX-1] Allowed Origins (mirrors index.ts ALLOWED_ORIGINS) ──────────────
-// streaming.ts — កែ 2 functions
 
-// Function 1
 export async function streamR2Video(
-  req:        Request,
-  env:        Env,
-  filename:   string,
-  corsOrigin: string  // ← ✅
+  req:         Request,
+  env:         Env,
+  filename:    string,
+  corsOrigin:  string  // ← receive ពី index.ts
 ): Promise<Response> {
-
-// Function 2  
-export async function proxyLiveStream(
-  req:        Request,
-  originUrl:  string,
-  corsOrigin: string  // ←  ✅
-): Promise<Response> {
+  // ប្រើ corsOrigin ផ្ទាល់ — មិនត្រូវ resolve ម្តងទៀត
 
 function resolveCorsOrigin(req: Request): string {
   const origin = req.headers.get("Origin") ?? "";
