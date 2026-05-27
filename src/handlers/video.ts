@@ -13,9 +13,10 @@ import {
 
 // ── [FIX-8] Allowed VIDEO_ORIGIN values ──
 const ALLOWED_VIDEO_ORIGINS = new Set([
-  "https://cdn.ultraedge-prod.fasterwgseverkh.workers.dev/443",
-  "https://stream.ultraedge-prod.fasterwgseverkh.workers.dev/:443",
-  "https://stream.ultraedge-stg.fasterwgseverkh.workers.dev/:443",
+  "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",
+  "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev/:443",
+  "https://cdn-ultraedge-prod.fasterwgseverkh.workers.dev/:127.0.0.1",
+  "https://1g12e6nfi4.cloudflare-gateway.com/dns-query/:127.0.0.1",
   // បន្ថែម origins ត្រឹមត្រូវនៅទីនេះ
 ]);
 
