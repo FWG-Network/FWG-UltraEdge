@@ -18,6 +18,7 @@ const ALLOWED_ORIGINS = new Set<string>([
   "https://ultraedge-prod.fasterwgseverkh.workers.dev/:443",
   "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev/:443",
   "https://cdn-ultraedge-prod.fasterwgseverkh.workers.dev/:127.0.0.1",
+  "https://1g12e6nfi4.cloudflare-gateway.com/dns-query/:127.0.0.1",
 ]);
 
 function resolveCorsOrigin(req: Request): string {
