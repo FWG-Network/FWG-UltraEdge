@@ -495,35 +495,161 @@ export default withSentry(
         }
 
         // ── Audio headers ───────────────────────────────────────────────────
-        if (isAudio) {
-          // [A7] Byte-range seeking support
-          headers.set("Accept-Ranges", "bytes");
+        // ── Audio headers ───────────────────────────────────────────────────
+if (isAudio) {
 
-          // [S1] Unified Cache-Control — matched timing with video
-          headers.set("Cache-Control",     buildMediaCacheControl(false, false));
-          headers.set("CDN-Cache-Control", "max-age=86400");
+  // ─────────────────────────────────────────────────────────────
+  // [A1] Byte-range support
+  // ─────────────────────────────────────────────────────────────
+  headers.set("Accept-Ranges", "bytes");
 
-          // [BT10] Never gzip audio — gzip on audio = corrupt bytes
-          headers.delete("Content-Encoding");
+  // ─────────────────────────────────────────────────────────────
+  // [S1][S7] Unified cache timing
+  // Audio MUST use same timing profile as video
+  // ─────────────────────────────────────────────────────────────
+  headers.set(
+    "Cache-Control",
+    buildMediaCacheControl(false, false)
+  );
 
-          // [S5] Preserve Content-Length — critical for player buffer calculation
-          // (already in headers from originResponse — do NOT delete it)
+  headers.set(
+    "CDN-Cache-Control",
+    "public, max-age=86400, stale-while-revalidate=3600"
+  );
 
-          // [S6] Remove Transfer-Encoding for non-live audio
-          //      Chunked encoding + Range requests = seeking to wrong PTS
-          if (!isLiveSegment) {
-            headers.delete("Transfer-Encoding");
-          }
+  // ─────────────────────────────────────────────────────────────
+  // [A2] Disable all transformations
+  // Prevent CF/origin recompression or transcoding
+  // ─────────────────────────────────────────────────────────────
+  headers.set("Cache-Status", "UltraEdge-Audio");
+  headers.set("X-Content-Type-Options", "nosniff");
 
-          // [BT3][BT4][BT5][S8][S9] Audio intelligence
-          applyAudioIntelligenceHeaders(headers, request, isLossless);
+  // ─────────────────────────────────────────────────────────────
+  // [A3] Remove dangerous encodings
+  // Audio must remain byte-perfect
+  // ─────────────────────────────────────────────────────────────
+  headers.delete("Content-Encoding");
 
-          // [BT9] Downgrade strong ETags to weak for byte-range audio
-          const etag = originResponse.headers.get("ETag");
-          if (etag && !etag.startsWith("W/")) {
-            headers.set("ETag", `W/${etag}`);
-          }
-        }
+  // Brotli/gzip hints removed for audio
+  headers.delete("Vary");
+
+  // ─────────────────────────────────────────────────────────────
+  // [S6] Transfer-Encoding fix
+  // Chunked audio + Range requests = broken seek clock
+  // ─────────────────────────────────────────────────────────────
+  if (!isLiveSegment) {
+    headers.delete("Transfer-Encoding");
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [A4] Preserve exact Content-Length
+  // Critical for DSP/player prebuffer calculation
+  // ─────────────────────────────────────────────────────────────
+  const contentLength = originResponse.headers.get("Content-Length");
+
+  if (contentLength) {
+    headers.set("Content-Length", contentLength);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [A5] Preserve byte-range metadata
+  // ─────────────────────────────────────────────────────────────
+  const contentRange = originResponse.headers.get("Content-Range");
+
+  if (contentRange) {
+    headers.set("Content-Range", contentRange);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [A6] Audio intelligence layer
+  // ─────────────────────────────────────────────────────────────
+  applyAudioIntelligenceHeaders(
+    headers,
+    request,
+    isLossless
+  );
+
+  // ─────────────────────────────────────────────────────────────
+  // [A7] Weak ETag for range stability
+  // ─────────────────────────────────────────────────────────────
+  const etag = originResponse.headers.get("ETag");
+
+  if (etag && !etag.startsWith("W/")) {
+    headers.set("ETag", `W/${etag}`);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [A8] Decoder stabilization
+  // Some Android AAC decoders behave differently
+  // when MIME parameters are omitted.
+  // ─────────────────────────────────────────────────────────────
+  const ct = headers.get("Content-Type")?.toLowerCase() ?? "";
+
+  if (ct === "audio/aac") {
+    headers.set(
+      "Content-Type",
+      "audio/aac; codecs=aac"
+    );
+  }
+
+  if (ct === "audio/mp4") {
+    headers.set(
+      "Content-Type",
+      "audio/mp4; codecs=mp4a.40.2"
+    );
+  }
+
+  if (ct === "audio/ogg") {
+    headers.set(
+      "Content-Type",
+      "audio/ogg; codecs=opus"
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [A9] Bluetooth latency tuning
+  // Helps Android DSP engines estimate sync offset
+  // ─────────────────────────────────────────────────────────────
+  headers.set("Timing-Allow-Origin", "*");
+  headers.set("X-Audio-Latency-Mode", "low-jitter");
+  headers.set("X-Audio-Buffer-Model", "stable-sync");
+
+  // ─────────────────────────────────────────────────────────────
+  // [A10] Prevent intermediary corruption
+  // ─────────────────────────────────────────────────────────────
+  headers.set("Accept-CH", "DPR, Width, Viewport-Width");
+  headers.set("Connection", "keep-alive");
+
+  // ─────────────────────────────────────────────────────────────
+  // [A11] Preserve origin audio metadata
+  // ─────────────────────────────────────────────────────────────
+  const preserveHeaders = [
+    "ICY-BR",
+    "ICY-NAME",
+    "ICY-GENRE",
+    "X-Playback-Session-Id",
+  ];
+
+  for (const h of preserveHeaders) {
+    const v = originResponse.headers.get(h);
+
+    if (v) {
+      headers.set(h, v);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [A12] Final unified Vary
+  // IMPORTANT:
+  // Do NOT let audio split into separate cache families
+  // ─────────────────────────────────────────────────────────────
+  headers.set(
+    "Vary",
+    corsOrigin
+      ? "Origin, Accept-Ranges"
+      : "Accept-Ranges"
+  );
+}
 
         // ── Video/segment headers ───────────────────────────────────────────
         if (isVideo || isSegment) {
