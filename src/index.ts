@@ -556,10 +556,10 @@ export default withSentry(
             headers.delete("Transfer-Encoding");
           }
 
-          // [A4] Preserve Content-Length for DSP/player prebuffer calculation
-          // [BUG-10 FIX] Guard: only set if value is a valid positive integer
-          // new Headers(originResponse.headers) already copies it, but Transfer-Encoding
-          // deletion above may have left a stale chunked response without Content-Length
+           [A4] Preserve Content-Length for DSP/player prebuffer calculation
+           [BUG-10 FIX] Guard: only set if value is a valid positive integer
+           new Headers(originResponse.headers) already copies it, but Transfer-Encoding
+           deletion above may have left a stale chunked response without Content-Length
           const contentLength = originResponse.headers.get("Content-Length");
           if (contentLength && /^\d+$/.test(contentLength)) {
             headers.set("Content-Length", contentLength);
@@ -571,9 +571,9 @@ export default withSentry(
             headers.set("Content-Range", contentRange);
           }
 
-          // [S4][A8] Decoder stabilization — codec params prevent Android AAC decoder
-          // from operating in generic mode which adds ~80ms decode latency
-          // [BUG-6 FIX] Use .includes() not === — Content-Type may have params suffix
+           [S4][A8] Decoder stabilization — codec params prevent Android AAC decoder
+           from operating in generic mode which adds ~80ms decode latency
+           [BUG-6 FIX] Use .includes() not === — Content-Type may have params suffix
           const ct = headers.get("Content-Type")?.toLowerCase() ?? "";
           if (ct.includes("audio/aac") && !ct.includes("codecs")) {
             headers.set("Content-Type", "audio/aac; codecs=aac");
@@ -589,18 +589,18 @@ export default withSentry(
             if (v) headers.set(h, v);
           }
 
-          // [BT9] Downgrade strong ETags to weak for byte-range audio
-          // Strong ETag requires byte-identical response; partial content breaks that
+           [BT9] Downgrade strong ETags to weak for byte-range audio
+           Strong ETag requires byte-identical response; partial content breaks that
           const etag = originResponse.headers.get("ETag");
           if (etag && !etag.startsWith("W/")) {
             headers.set("ETag", `W/${etag}`);
           }
 
-          // [A6][BT1–BT10][S8][S9] Audio Intelligence — MUST run last
-          // Sets X-Audio-Profile, X-Audio-Quality, X-Audio-Channels, X-Audio-Latency-Mode etc.
-          // [BUG-1 FIX] Pass url.pathname — do NOT redeclare `url` inside isAudio block
-          // [BUG-7 FIX] applyAudioIntelligenceHeaders() is authoritative for latency/profile
-          //             — no manual X-Audio-Latency-Mode set before this call
+           [A6][BT1–BT10][S8][S9] Audio Intelligence — MUST run last
+           Sets X-Audio-Profile, X-Audio-Quality, X-Audio-Channels, X-Audio-Latency-Mode etc.
+           [BUG-1 FIX] Pass url.pathname — do NOT redeclare `url` inside isAudio block
+           [BUG-7 FIX] applyAudioIntelligenceHeaders() is authoritative for latency/profile
+                       — no manual X-Audio-Latency-Mode set before this call
           applyAudioIntelligenceHeaders(headers, request, isLossless, url.pathname);
 
           // NOTE: Vary is NOT set here — [S10][BUG-2][BUG-3 FIX]
