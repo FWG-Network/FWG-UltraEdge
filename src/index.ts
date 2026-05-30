@@ -495,8 +495,7 @@ export default withSentry(
         }
 
         // ── Audio headers ───────────────────────────────────────────────────
-        // ── Audio headers ───────────────────────────────────────────────────
-if (isAudio) {
+     if (isAudio) {
 
   // ─────────────────────────────────────────────────────────────
   // [A1] Byte-range support
@@ -561,13 +560,47 @@ if (isAudio) {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // [A6] Audio intelligence layer
+  // [A6] Audio Intelligence Layer (កែសម្រួលថ្មី)
   // ─────────────────────────────────────────────────────────────
-  applyAudioIntelligenceHeaders(
-    headers,
-    request,
-    isLossless
-  );
+  
+  // ១. បង្កើត Variable ដើម្បីសម្គាល់ប្រភេទមាតិកា
+  const url = new URL(request.url).pathname.toLowerCase();
+  const isMusic = url.includes("/music/") || url.includes("/mp3/") || url.includes("/spotify-style/");
+  const isMovie = url.includes("/movies/") || url.includes("/cinema/") || url.includes("/netflix-style/");
+
+  // ២. Logic ផ្លាស់ប្តូរសំឡេងតាមកាលៈទេសៈ
+  if (isMovie) {
+    // 🎬 របៀប Netflix Audio: បញ្ចេញសំឡេងខ្លាំង ច្បាស់ និងមាន Surround Sound ល្អ
+    headers.set("X-Audio-Profile", "cinema-spatial");
+    headers.set("X-Audio-Dynamic-Range", "high-cinema"); // ពង្រីកទំហំសំឡេងឱ្យដូចរោងកុន
+    headers.set("X-Audio-DSP-Engine", "dolby-surround-v2");
+    headers.set("X-Audio-Buffer-Model", "aggressive-prebuffer"); // Buffer ឱ្យច្រើនការពារការទាក់ពេលមើលរឿង
+    headers.set("X-Audio-Latency-Mode", "fixed-sync"); // រក្សាសំឡេង និងរូបភាពឱ្យដើរទាន់គ្នា ១០០%
+  } 
+  else if (isMusic) {
+    // 🎵 របៀប Music: សំឡេងស្រាលស្រទន់ Balance ខ្លាំង (Acoustic Friendly)
+    headers.set("X-Audio-Profile", "soft-balance-studio");
+    headers.set("X-Audio-Dynamic-Range", "normalized-soft"); // ធ្វើឱ្យសំឡេងស្រាលស្រទន់ មិនឱ្យបុកខ្លាំងពេក
+    headers.set("X-Audio-Equalizer", "flat-response"); // បង្កើតតុល្យភាពរវាងភ្លេង និងសំឡេងច្រៀង
+    headers.set("X-Audio-Latency-Mode", "low-jitter");
+    headers.set("X-Audio-Buffer-Model", "seamless-loop");
+  } else {
+    // ⚙️ របៀបទូទៅ (Standard)
+    headers.set("X-Audio-Profile", "standard-balanced");
+  }
+
+  // ៣. បន្ថែម Smart Device Awareness (Android vs iPhone)
+  const ua = request.headers.get("User-Agent") || "";
+  if (ua.includes("Android")) {
+    // Android Decoders ត្រូវការ Buffer ថេរ (Stable Buffer)
+    headers.set("X-Audio-Decoder-Hint", "android-stable-aac");
+  } else if (ua.includes("iPhone") || ua.includes("iPad")) {
+    // iOS ត្រូវការដោតជាមួយ AirPlay ឬ Bluetooth Latency ទាប
+    headers.set("X-Audio-Decoder-Hint", "ios-coreaudio-lowlat");
+  }
+
+  // ហៅអនុគមន៍ Intelligence ដែលមានស្រាប់
+  applyAudioIntelligenceHeaders(headers, request, isLossless);
 
   // ─────────────────────────────────────────────────────────────
   // [A7] Weak ETag for range stability
