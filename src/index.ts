@@ -1,6 +1,7 @@
 import { withSentry } from "@sentry/cloudflare";
 import * as Sentry    from "@sentry/cloudflare";
 
+
  * FWG-UltraEdge — Cloudflare Worker v3.3.0
  * ════════════════════════════════════════════════════════════════════════════
  * CHANGELOG v3.3.0 — "Audio-Video Sync & Balance Engine" 🎵🎬
@@ -165,8 +166,8 @@ function resolveCorsOrigin(request: Request): string | null {
 }
 
 // ─── [3][S3] Prefetch link — only for VIDEO HLS segments ──────────────────────
-// [S3] Audio mux segments (.ts) must NOT be prefetched — causes PTS clock drift
-// Only enable for streams under a path that is clearly video-only (no /audio/)
+ [S3] Audio mux segments (.ts) must NOT be prefetched — causes PTS clock drift
+ Only enable for streams under a path that is clearly video-only (no /audio/)
 const SAFE_PATH_RE        = /^[a-zA-Z0-9._\-/]+$/;
 const AUDIO_STREAM_PATH_RE = /\/(audio|vocals?|voice|speech|sound)\//i;
 
@@ -269,9 +270,9 @@ function classifyPath(pathname: string) {
 }
 
 // ─── [S1][S7] Unified Media Cache-Control builder ─────────────────────────────
-// [S1] Audio and video MUST use identical cache timing to prevent buffer desync.
-//      Different max-age values between audio/video = one arrives stale, one fresh
-//      = player buffers at different rates = vocal/music timing drift.
+ [S1] Audio and video MUST use identical cache timing to prevent buffer desync.
+     Different max-age values between audio/video = one arrives stale, one fresh
+     = player buffers at different rates = vocal/music timing drift.
 function buildMediaCacheControl(isManifest: boolean, isLiveSegment: boolean): string {
   if (isManifest) {
     // Manifests change every ~2s in live HLS — never cache
@@ -333,26 +334,223 @@ function applySecurityHeaders(
   headers.set("Cross-Origin-Resource-Policy", "cross-origin");
 }
 
-// ─── [BT1–BT10][S8][S9][A6] Audio Intelligence Headers ───────────────────────
-// pathname param used for content-type routing [A6] — avoids BUG-1 url redeclaration
+// ══════════════════════════════════════════════════════════════════════════════
+// ADAPTIVE EQ ENGINE v3.4.0 — "A+ Immersion System"
+// ══════════════════════════════════════════════════════════════════════════════
+//
+ Auto-detects content context → selects EQ profile → emits headers
+ Player apps (Poweramp, UAPP, Neutron, VLC) read these to configure their DSP.
+//
+ Detection priority (highest → lowest):
+   1. X-Content-Mode request header  (player app declares mode explicitly)
+   2. URL path pattern               (/music/, /movies/, /games/, /podcast/)
+   3. MIME type                      (audio/flac → force MUSIC_HIFI)
+   4. Bluetooth tier                 (LDAC → HIFI, SBC → compensate)
+   5. Device UA                      (Android DSP vs iOS CoreAudio)
+//
+ EQ Profiles:
+   MUSIC_HIFI    → flat ref + sub +3dB + air +2dB  — LDAC/aptX audiophile
+   MUSIC_CASUAL  → V-shape: bass +4dB, treble +2dB — SBC/AAC casual BT
+   CINEMA        → THX: sub +5dB, mid +3dB (dialogue), fixed AV sync
+   GAMING        → spatial: 1-4kHz +4dB, sub +2dB, ultra-low latency
+   PODCAST       → mid presence +5dB, bass rolloff -3dB (voice clarity)
+   STANDARD      → neutral reference, no modification
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ─── EQ Profile definitions ───────────────────────────────────────────────────
+interface EQProfile {
+  name:         string;   // human-readable label
+  sub:          string;   // sub-bass  (<80Hz)   dB delta e.g. "+3"
+  bass:         string;   // bass      (80-300Hz) dB delta
+  mids:         string;   // mids      (300Hz-3kHz) dB delta
+  highmid:      string;   // high-mid  (3-8kHz) dB delta
+  treble:       string;   // treble    (8-16kHz) dB delta
+  air:          string;   // air       (16kHz+) dB delta
+  spatial:      "stereo" | "surround" | "spatial" | "binaural";
+  dynamicRange: string;
+  latency:      string;
+  buffer:       string;
+  dspEngine:    string;
+}
+
+const EQ_PROFILES: Record<string, EQProfile> = {
+  // 🎵 Music Hi-Fi — audiophile flat reference, lifted sub + air
+  // Designed for LDAC/aptX HD headphones, studio monitor-style response
+  MUSIC_HIFI: {
+    name:         "music-hifi-studio",
+    sub:          "+3",   // sub-bass presence without muddiness
+    bass:         "+1",   // gentle bass warmth
+    mids:         "0",    // flat mids — vocal/instrument balance preserved
+    highmid:      "+1",   // slight definition boost for strings/guitar
+    treble:       "+1",   // detail and clarity
+    air:          "+2",   // 16kHz+ sparkle — cymbals, breath, space
+    spatial:      "stereo",
+    dynamicRange: "lossless-wide",
+    latency:      "low-jitter",
+    buffer:       "seamless-loop",
+    dspEngine:    "reference-flat",
+  },
+
+  // 🎵 Music Casual — V-shape for Bluetooth casual listening
+  // Compensates for SBC/AAC codec compression artifacts at high-freq
+  MUSIC_CASUAL: {
+    name:         "music-casual-vshape",
+    sub:          "+3",   // punchy bass for casual listening
+    bass:         "+4",   // strong bass presence
+    mids:         "-1",   // slight mid scoop (V-shape)
+    highmid:      "+1",
+    treble:       "+2",   // compensate SBC treble loss
+    air:          "+1",
+    spatial:      "stereo",
+    dynamicRange: "normalized-soft",
+    latency:      "low-jitter",
+    buffer:       "seamless-loop",
+    dspEngine:    "v-shape-bt",
+  },
+
+  // 🎬 Cinema — THX-style, wide dynamic range, AV sync locked
+  // Dialogue clarity boost, immersive sub for action, spatial surround
+  CINEMA: {
+    name:         "cinema-spatial-thx",
+    sub:          "+5",   // explosive sub for action scenes
+    bass:         "+2",   // body and weight
+    mids:         "+3",   // dialogue clarity — critical for speech intelligibility
+    highmid:      "-1",   // reduce harshness on loud effects
+    treble:       "+1",   // detail without fatigue
+    air:          "+1",
+    spatial:      "surround",
+    dynamicRange: "high-cinema",
+    latency:      "fixed-sync",   // AV lock — MUST not drift
+    buffer:       "aggressive-prebuffer",
+    dspEngine:    "dolby-surround-v2",
+  },
+
+  // 🎮 Gaming — competitive spatial, footstep detection, ultra-low latency
+  // High-mid boost for directional cues, sub for immersion
+  GAMING: {
+    name:         "gaming-spatial-competitive",
+    sub:          "+2",   // explosion/LFE immersion
+    bass:         "+2",   // weapon body
+    mids:         "+2",   // general presence
+    highmid:      "+4",   // 1-4kHz: footsteps, reload, spatial cues — CRITICAL
+    treble:       "+3",   // gunshots, high-freq positional audio
+    air:          "+1",
+    spatial:      "spatial",   // 3D/binaural positioning
+    dynamicRange: "gaming-dynamic",
+    latency:      "ultra-low", // competitive gaming — every ms counts
+    buffer:       "ultra-low-latency",
+    dspEngine:    "hrtf-spatial-v1",
+  },
+
+  // 🎙️ Podcast / Voice — speech intelligibility, roll off rumble
+  PODCAST: {
+    name:         "podcast-voice-clarity",
+    sub:          "-3",   // roll off sub — removes room rumble/mic handling noise
+    bass:         "-2",   // reduce boominess
+    mids:         "+5",   // 250Hz-3kHz: core speech intelligibility band
+    highmid:      "+2",   // consonant clarity (s, t, f sounds)
+    treble:       "0",    // neutral
+    air:          "-1",   // reduce sibilance
+    spatial:      "stereo",
+    dynamicRange: "voice-compressed",
+    latency:      "low-jitter",
+    buffer:       "stable-sync",
+    dspEngine:    "voice-presence",
+  },
+
+  // ⚙️ Standard — neutral reference, no EQ modification
+  STANDARD: {
+    name:         "standard-balanced",
+    sub:          "0",
+    bass:         "0",
+    mids:         "0",
+    highmid:      "0",
+    treble:       "0",
+    air:          "0",
+    spatial:      "stereo",
+    dynamicRange: "standard",
+    latency:      "low-jitter",
+    buffer:       "stable-sync",
+    dspEngine:    "passthrough",
+  },
+};
+
+// ─── [EQ1] Content mode detection — 5-signal priority chain ──────────────────
+type ContentMode = "music-hifi" | "music-casual" | "cinema" | "gaming" | "podcast" | "standard";
+
+function detectContentMode(
+  request:    Request,
+  path:       string,        // lowercase pathname from handler
+  isLossless: boolean,
+  tier:       BluetoothTier,
+): ContentMode {
+  // ── Signal 1: Explicit X-Content-Mode header (highest priority) ───────────
+  // Player app can declare mode directly — overrides all auto-detection
+  const explicit = request.headers.get("X-Content-Mode")?.toLowerCase() ?? "";
+  if (explicit === "cinema"  || explicit === "movie")   return "cinema";
+  if (explicit === "gaming"  || explicit === "game")    return "gaming";
+  if (explicit === "podcast" || explicit === "voice")   return "podcast";
+  if (explicit === "music-hifi"   || explicit === "hifi")   return "music-hifi";
+  if (explicit === "music-casual" || explicit === "music")  return "music-casual";
+
+  // ── Signal 2: URL path pattern ────────────────────────────────────────────
+  const isCinemaPath  = /\/(movies?|cinema|film|netflix-style|series|episode)\//i.test(path);
+  const isGamingPath  = /\/(games?|gaming|soundtrack|ost|bgm)\//i.test(path);
+  const isPodcastPath = /\/(podcast|voice|speech|talk|interview|radio)\//i.test(path);
+  const isMusicPath   = /\/(music|songs?|mp3|audio|album|artist|spotify-style|track)\//i.test(path);
+
+  if (isCinemaPath)  return "cinema";
+  if (isGamingPath)  return "gaming";
+  if (isPodcastPath) return "podcast";
+
+  // ── Signal 3: MIME type (lossless = always hi-fi music mode) ─────────────
+  // FLAC/WAV/AIFF files are almost always music — never gaming/cinema
+  if (isLossless) return "music-hifi";
+
+  if (isMusicPath) {
+    // ── Signal 4: Bluetooth tier refines music → hifi or casual ─────────────
+    // Hi-res codecs → serve studio-quality EQ
+    // SBC/unknown   → serve V-shape compensation EQ
+    const hiResTiers: BluetoothTier[] = ["ldac-990", "ldac-660", "aptx-adaptive", "aptx-hd", "wired"];
+    return hiResTiers.includes(tier) ? "music-hifi" : "music-casual";
+  }
+
+  return "standard";
+}
+
+// ─── [EQ2] Profile selector — maps mode to EQProfile ─────────────────────────
+function selectEQProfile(mode: ContentMode): EQProfile {
+  switch (mode) {
+    case "music-hifi":   return EQ_PROFILES.MUSIC_HIFI;
+    case "music-casual": return EQ_PROFILES.MUSIC_CASUAL;
+    case "cinema":       return EQ_PROFILES.CINEMA;
+    case "gaming":       return EQ_PROFILES.GAMING;
+    case "podcast":      return EQ_PROFILES.PODCAST;
+    default:             return EQ_PROFILES.STANDARD;
+  }
+}
+
+// ─── [BT1–BT10][S8][S9][EQ1–EQ2] Audio Intelligence Headers ─────────────────
+// pathname param used for content-type routing — avoids BUG-1 url redeclaration
+// applyAudioIntelligenceHeaders() runs LAST in the audio block — values are final
 function applyAudioIntelligenceHeaders(
   headers:    Headers,
   request:    Request,
   isLossless: boolean,
-  pathname:   string,   // [A6] pass from handler — do NOT redeclare url inside
+  pathname:   string,   // pass from handler — do NOT redeclare url inside
 ): void {
   const tier        = detectBluetoothTier(request);
   const qualityHint = resolveAudioQualityHint(tier, isLossless);
   const path        = pathname.toLowerCase();
 
+  // ── Bluetooth quality hint ────────────────────────────────────────────────
   headers.set("X-Audio-Quality", qualityHint);
 
-  // [S8] Passthrough channel info from origin first.
-  //      Only default to "stereo" if origin didn't specify.
-  //      Forcing stereo on a mono source = incorrect upmix = vocal detaches from music.
+  // [S8] Channel passthrough — only default to stereo if origin didn't specify
+  // Forcing stereo on mono source = wrong upmix = vocal detaches from music
   const originChannels = headers.get("X-Audio-Channels");
   if (!originChannels) {
-    headers.set("X-Audio-Channels", "stereo"); // safe default for Bluetooth stereo mode
+    headers.set("X-Audio-Channels", "stereo");
   }
 
   // [BT3] Bitrate passthrough
@@ -384,49 +582,40 @@ function applyAudioIntelligenceHeaders(
     headers.get("X-Content-Duration") ?? headers.get("Content-Duration");
   if (duration) headers.set("X-Content-Duration", duration);
 
-  // [S9] Timing-Allow-Origin — lets player DSP engines measure fetch latency
+  // [S9] Timing-Allow-Origin — player DSP engines measure fetch latency for AV sync
   headers.set("Timing-Allow-Origin", "*");
 
-  // ── [A6] Content-aware Audio Profile ───────────────────────────────────────
-  // Uses `path` (from handler scope) — NOT a new `url` declaration [fixes BUG-1]
-  // Sets X-Audio-Profile / Dynamic-Range / DSP hints for player apps
-  // applyAudioIntelligenceHeaders() runs LAST in the audio block,
-  // so these values are final and cannot be overwritten [fixes BUG-7]
-  const isMoviePath = path.includes("/movies/") ||
-                      path.includes("/cinema/")  ||
-                      path.includes("/netflix-style/");
-  const isMusicPath = path.includes("/music/")   ||
-                      path.includes("/mp3/")      ||
-                      path.includes("/spotify-style/");
+  // ── [EQ1] Detect content mode via 5-signal priority chain ─────────────────
+  const mode    = detectContentMode(request, path, isLossless, tier);
+  const profile = selectEQProfile(mode);
 
-  if (isMoviePath) {
-    // 🎬 Cinema mode: wide dynamic range, sync-locked to video
-    headers.set("X-Audio-Profile",        "cinema-spatial");
-    headers.set("X-Audio-Dynamic-Range",  "high-cinema");
-    headers.set("X-Audio-DSP-Engine",     "dolby-surround-v2");
-    headers.set("X-Audio-Buffer-Model",   "aggressive-prebuffer");
-    headers.set("X-Audio-Latency-Mode",   "fixed-sync");     // AV lock
-  } else if (isMusicPath) {
-    // 🎵 Music mode: flat response, low-jitter, seamless loop
-    headers.set("X-Audio-Profile",        "soft-balance-studio");
-    headers.set("X-Audio-Dynamic-Range",  "normalized-soft");
-    headers.set("X-Audio-Equalizer",      "flat-response");
-    headers.set("X-Audio-Buffer-Model",   "seamless-loop");
-    headers.set("X-Audio-Latency-Mode",   "low-jitter");     // music — jitter minimised
-  } else {
-    // ⚙️ Standard balanced
-    headers.set("X-Audio-Profile",        "standard-balanced");
-    headers.set("X-Audio-Latency-Mode",   "low-jitter");
-  }
+  // ── [EQ2] Emit EQ profile headers ─────────────────────────────────────────
+  // Player apps read these to configure their DSP equaliser bands.
+  // Values are dB delta strings: "+3", "0", "-2" etc.
+  // Apps that don't support these headers ignore them gracefully.
+  headers.set("X-Audio-Profile",        profile.name);
+  headers.set("X-Audio-Mode",           mode);            // machine-readable mode
+  headers.set("X-Audio-EQ-Sub",         profile.sub);     // <80Hz
+  headers.set("X-Audio-EQ-Bass",        profile.bass);    // 80-300Hz
+  headers.set("X-Audio-EQ-Mids",        profile.mids);    // 300Hz-3kHz
+  headers.set("X-Audio-EQ-HighMid",     profile.highmid); // 3-8kHz
+  headers.set("X-Audio-EQ-Treble",      profile.treble);  // 8-16kHz
+  headers.set("X-Audio-EQ-Air",         profile.air);     // 16kHz+
+  headers.set("X-Audio-Spatial",        profile.spatial);
+  headers.set("X-Audio-Dynamic-Range",  profile.dynamicRange);
+  headers.set("X-Audio-Latency-Mode",   profile.latency);
+  headers.set("X-Audio-Buffer-Model",   profile.buffer);
+  headers.set("X-Audio-DSP-Engine",     profile.dspEngine);
 
-  // ── [A8] Device-aware decoder hint ─────────────────────────────────────────
-  // Android AAC decoders need stable buffer; iOS wants low-latency CoreAudio path
-  // Set AFTER profile so device hint doesn't conflict with latency mode
+  // ── [A8] Device-aware decoder hint ────────────────────────────────────────
+  // Set AFTER profile — device hint is additive, not overriding
   const ua = request.headers.get("User-Agent") ?? "";
   if (ua.includes("Android")) {
     headers.set("X-Audio-Decoder-Hint", "android-stable-aac");
   } else if (ua.includes("iPhone") || ua.includes("iPad")) {
     headers.set("X-Audio-Decoder-Hint", "ios-coreaudio-lowlat");
+  } else {
+    headers.set("X-Audio-Decoder-Hint", "desktop-generic");
   }
 }
 
@@ -525,7 +714,7 @@ export default withSentry(
         applySecurityHeaders(headers, corsOrigin, isMedia);
 
         // ── [S4] Force correct Content-Type for known media extensions ──────
-        //    Override wrong/missing origin Content-Type to prevent decoder mismatch
+            Override wrong/missing origin Content-Type to prevent decoder mismatch
         const detectedType = detectMediaContentType(url.pathname);
         if (detectedType) {
           const currentType = headers.get("Content-Type") ?? "";
@@ -550,8 +739,8 @@ export default withSentry(
           // [A2][BT10] Never gzip/brotli audio — encoding on audio = corrupt bytes
           headers.delete("Content-Encoding");
 
-          // [S6] Transfer-Encoding: chunked + Range requests = wrong PTS on seek
-          // ONLY remove for non-live content — live segments need chunked for streaming
+           [S6] Transfer-Encoding: chunked + Range requests = wrong PTS on seek
+           ONLY remove for non-live content — live segments need chunked for streaming
           if (!isLiveSegment) {
             headers.delete("Transfer-Encoding");
           }
@@ -603,8 +792,8 @@ export default withSentry(
                        — no manual X-Audio-Latency-Mode set before this call
           applyAudioIntelligenceHeaders(headers, request, isLossless, url.pathname);
 
-          // NOTE: Vary is NOT set here — [S10][BUG-2][BUG-3 FIX]
-          // See [S10] block at end of handler — set ONCE, final value, after all headers done
+           NOTE: Vary is NOT set here — [S10][BUG-2][BUG-3 FIX]
+           See [S10] block at end of handler — set ONCE, final value, after all headers done
         }
 
         // ── Video/segment headers ───────────────────────────────────────────
