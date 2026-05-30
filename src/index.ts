@@ -359,13 +359,13 @@ function applySecurityHeaders(
 
 // ─── EQ Profile definitions ───────────────────────────────────────────────────
 interface EQProfile {
-  name:         string;   // human-readable label
-  sub:          string;   // sub-bass  (<80Hz)   dB delta e.g. "+3"
-  bass:         string;   // bass      (80-300Hz) dB delta
-  mids:         string;   // mids      (300Hz-3kHz) dB delta
-  highmid:      string;   // high-mid  (3-8kHz) dB delta
-  treble:       string;   // treble    (8-16kHz) dB delta
-  air:          string;   // air       (16kHz+) dB delta
+  name:         string;    human-readable label
+  sub:          string;    sub-bass  (<80Hz)   dB delta e.g. "+3"
+  bass:         string;    bass      (80-300Hz) dB delta
+  mids:         string;    mids      (300Hz-3kHz) dB delta
+  highmid:      string;    high-mid  (3-8kHz) dB delta
+  treble:       string;    treble    (8-16kHz) dB delta
+  air:          string;    air       (16kHz+) dB delta
   spatial:      "stereo" | "surround" | "spatial" | "binaural";
   dynamicRange: string;
   latency:      string;
@@ -375,15 +375,15 @@ interface EQProfile {
 
 const EQ_PROFILES: Record<string, EQProfile> = {
   // 🎵 Music Hi-Fi — audiophile flat reference, lifted sub + air
-  // Designed for LDAC/aptX HD headphones, studio monitor-style response
+   Designed for LDAC/aptX HD headphones, studio monitor-style response
   MUSIC_HIFI: {
     name:         "music-hifi-studio",
-    sub:          "+3",   // sub-bass presence without muddiness
-    bass:         "+1",   // gentle bass warmth
-    mids:         "0",    // flat mids — vocal/instrument balance preserved
-    highmid:      "+1",   // slight definition boost for strings/guitar
-    treble:       "+1",   // detail and clarity
-    air:          "+2",   // 16kHz+ sparkle — cymbals, breath, space
+    sub:          "+3",    sub-bass presence without muddiness
+    bass:         "+1",    gentle bass warmth
+    mids:         "0",     flat mids — vocal/instrument balance preserved
+    highmid:      "+1",    slight definition boost for strings/guitar
+    treble:       "+1",    detail and clarity
+    air:          "+2",    16kHz+ sparkle — cymbals, breath, space
     spatial:      "stereo",
     dynamicRange: "lossless-wide",
     latency:      "low-jitter",
@@ -392,14 +392,14 @@ const EQ_PROFILES: Record<string, EQProfile> = {
   },
 
   // 🎵 Music Casual — V-shape for Bluetooth casual listening
-  // Compensates for SBC/AAC codec compression artifacts at high-freq
+   Compensates for SBC/AAC codec compression artifacts at high-freq
   MUSIC_CASUAL: {
     name:         "music-casual-vshape",
-    sub:          "+3",   // punchy bass for casual listening
-    bass:         "+4",   // strong bass presence
-    mids:         "-1",   // slight mid scoop (V-shape)
+    sub:          "+3",    punchy bass for casual listening
+    bass:         "+4",    strong bass presence
+    mids:         "-1",    slight mid scoop (V-shape)
     highmid:      "+1",
-    treble:       "+2",   // compensate SBC treble loss
+    treble:       "+2",    compensate SBC treble loss
     air:          "+1",
     spatial:      "stereo",
     dynamicRange: "normalized-soft",
@@ -412,11 +412,11 @@ const EQ_PROFILES: Record<string, EQProfile> = {
   // Dialogue clarity boost, immersive sub for action, spatial surround
   CINEMA: {
     name:         "cinema-spatial-thx",
-    sub:          "+5",   // explosive sub for action scenes
-    bass:         "+2",   // body and weight
-    mids:         "+3",   // dialogue clarity — critical for speech intelligibility
-    highmid:      "-1",   // reduce harshness on loud effects
-    treble:       "+1",   // detail without fatigue
+    sub:          "+5",    explosive sub for action scenes
+    bass:         "+2",    body and weight
+    mids:         "+3",    dialogue clarity — critical for speech intelligibility
+    highmid:      "-1",    reduce harshness on loud effects
+    treble:       "+1",    detail without fatigue
     air:          "+1",
     spatial:      "surround",
     dynamicRange: "high-cinema",
