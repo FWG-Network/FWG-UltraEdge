@@ -150,13 +150,13 @@ function resolveAudioQualityHint(tier: BluetoothTier, isLossless: boolean): stri
 
 // ─── [1][V5] CORS allowlist ────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = new Set<string>([
-  "https://ultraedge-prod.fasterwgseverkh.workers.dev",
-  "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev",
-  "https://cdn-ultraedge-prod.fasterwgseverkh.workers.dev",
-  "https://1g12e6nfi4.cloudflare-gateway.com",
-  "https://ultraedge-stg.fasterwgseverkh.workers.dev",
-  "https://stream-ultraedge-stg.fasterwgseverkh.workers.dev",
-  "https://cdn-ultraedge-stg.fasterwgseverkh.workers.dev",
+  "https://ultraedge-prod.fasterwgseverkh.workers.dev/",
+  "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev/",
+  "https://cdn-ultraedge-prod.fasterwgseverkh.workers.dev/",
+  "https://1g12e6nfi4.cloudflare-gateway.com/",
+  "https://ultraedge-stg.fasterwgseverkh.workers.dev/",
+  "https://stream-ultraedge-stg.fasterwgseverkh.workers.dev/",
+  "https://cdn-ultraedge-stg.fasterwgseverkh.workers.dev/",
 ]);
 
 function resolveCorsOrigin(request: Request): string | null {
