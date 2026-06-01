@@ -184,8 +184,8 @@ const ALLOWED_ORIGINS = new Set<string>([
   // These are the origins that appear when another CF Worker proxies requests
   // to this Worker via fetch() over HTTP (not Service Binding).
   // Service Binding calls skip CORS entirely — no Origin header emitted.
-  "https://proxy-ultraedge-prod.fasterwgseverkh.workers.dev/",
-  "https://proxy-ultraedge-stg.fasterwgseverkh.workers.dev/",
+  // "https://proxy-ultraedge-prod.fasterwgseverkh.workers.dev/",
+  //"https://proxy-ultraedge-stg.fasterwgseverkh.workers.dev/",
   // Add custom domain proxy if you route via a zone:
   // "https://proxy.fasterwgseverkh.com",
 ]);
