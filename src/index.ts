@@ -2,24 +2,15 @@ import { withSentry } from "@sentry/cloudflare";
 import * as Sentry    from "@sentry/cloudflare";
 
 /**
- * FWG-UltraEdge — Cloudflare Worker v3.5.0
+ * FWG-UltraEdge — Cloudflare Worker v3.3.0
  * ════════════════════════════════════════════════════════════════════════════
- * CHANGELOG v3.5.0 — "Trusted Proxy + Adaptive EQ Engine" 🌐🎧
+ * CHANGELOG v3.3.0 — "Audio-Video Sync & Balance Engine" 🎵🎬
  * ════════════════════════════════════════════════════════════════════════════
  *
  * 🔐 Security (v3.1.0+): [1–11] carried — no changes
  * 🎬 Video Quality (v3.1.0+): [V1–V5] carried — no changes
  * 🎵 Audio Quality (v3.1.0+): [A1–A7] carried — no changes
  * 🎧 BT Intelligence (v3.2.0+): [BT1–BT10] carried — no changes
- * 🎯 AV Sync (v3.3.0+): [S1–S10] carried — no changes
- * 🎚️ Adaptive EQ (v3.4.0+): [EQ1–EQ2] carried — no changes
- *
- * 🌐 NEW v3.5.0 — Trusted Proxy Integration:
- *   [P1] ALLOWED_ORIGINS extended with proxy domains (CF Workers pattern)
- *   [P2] PROXY_SECRET validation — X-Internal-Service header guards XFF trust
- *   [P3] resolveClientIP() — 3-tier chain: CF-Connecting-IP→X-Real-IP→XFF
- *   [P4] Env: PROXY_SECRET + ULTRAEDGE_PROXY Service Binding
- *   [P5] X-Forwarded-For RFC 7239 passthrough to origin
  *
  * 🎯 NEW v3.3.0 — Audio-Video Sync fixes ("vocal ≠ music desync"):
  *
@@ -98,23 +89,12 @@ import * as Sentry    from "@sentry/cloudflare";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 export interface Env {
-  // 🔐 Secrets — wrangler secret put <NAME> --env <production|staging>
   SENTRY_DSN:        string;
   CF_CLIENT_ID:      string;
   CF_CLIENT_SECRET:  string;
-  // [P2] Shared secret — proxy must send X-Internal-Service: <this value>
-  // Set via: wrangler secret put PROXY_SECRET --env production
-  PROXY_SECRET:      string;
-
-  // Bindings
   ULTRA_EDGE_KV:     KVNamespace;
   ULTRA_EDGE_VIDEOS: R2Bucket;
   SMART_ROUTER:      DurableObjectNamespace;
-  // [P4] Service Binding — internal zero-hop call from proxy Worker
-  // Add to wrangler.toml: [[services]] binding="ULTRAEDGE_PROXY" service="proxy-worker-name"
-  ULTRAEDGE_PROXY?:  Fetcher;   // optional: present only when proxy worker is bound
-
-  // Vars (wrangler.toml [vars])
   ENVIRONMENT:       string;
   APP_NAME:          string;
   APP_VERSION:       string;
@@ -168,10 +148,7 @@ function resolveAudioQualityHint(tier: BluetoothTier, isLossless: boolean): stri
   }
 }
 
-// ─── [1][V5][P1] CORS allowlist ───────────────────────────────────────────────
-// [P1] Proxy domains follow same https://xxx.fasterwgseverkh.* convention.
-//      Service Binding calls arrive with no Origin header at all — CORS skipped.
-//      HTTP proxy calls arrive with proxy's domain as Origin → must be listed here.
+// ─── [1][V5] CORS allowlist ────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = new Set<string>([
   "https://ultraedge-prod.fasterwgseverkh.workers.dev/",
   "https://stream-ultraedge-prod.fasterwgseverkh.workers.dev/",
@@ -180,14 +157,6 @@ const ALLOWED_ORIGINS = new Set<string>([
   "https://ultraedge-stg.fasterwgseverkh.workers.dev/",
   "https://stream-ultraedge-stg.fasterwgseverkh.workers.dev/",
   "https://cdn-ultraedge-stg.fasterwgseverkh.workers.dev/",
-  // ── [P1] Proxy Workers (HTTP proxy path) ──
-  // These are the origins that appear when another CF Worker proxies requests
-  // to this Worker via fetch() over HTTP (not Service Binding).
-  // Service Binding calls skip CORS entirely — no Origin header emitted.
-  // "https://proxy-ultraedge-prod.fasterwgseverkh.workers.dev/",
-  //"https://proxy-ultraedge-stg.fasterwgseverkh.workers.dev/",
-  // Add custom domain proxy if you route via a zone:
-  // "https://proxy.fasterwgseverkh.com",
 ]);
 
 function resolveCorsOrigin(request: Request): string | null {
@@ -196,62 +165,10 @@ function resolveCorsOrigin(request: Request): string | null {
   return null;
 }
 
-// ─── [P2] Trusted proxy validation ────────────────────────────────────────────
-// Proxy worker MUST send X-Internal-Service header with value matching PROXY_SECRET.
-// Without this, any request can forge X-Forwarded-For to spoof IP for rate limit bypass.
-// Returns true only when: secret is configured AND request carries matching value.
-function isFromTrustedProxy(request: Request, env: Env): boolean {
-  if (!env.PROXY_SECRET) return false;  // secret not configured → reject all proxy claims
-  const sent = request.headers.get("X-Internal-Service") ?? "";
-  // Constant-time comparison to prevent timing attacks
-  if (sent.length !== env.PROXY_SECRET.length) return false;
-  let diff = 0;
-  for (let i = 0; i < sent.length; i++) {
-    diff |= sent.charCodeAt(i) ^ env.PROXY_SECRET.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
-// ─── [P3] Real client IP resolution — 3-tier chain ────────────────────────────
-// CF-Connecting-IP is always the immediate TCP peer (set by CF, cannot be forged).
-// X-Real-IP / X-Forwarded-For are only trusted when proxy secret is validated [P2].
-// IP format validation blocks header injection (e.g. "1.2.3.4, evil-header: x").
-const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
-const IPV6_RE = /^[0-9a-fA-F:]{2,39}$/;
-
-function isValidIP(ip: string): boolean {
-  const s = ip.trim();
-  return IPV4_RE.test(s) || IPV6_RE.test(s);
-}
-
-function resolveClientIP(request: Request, env: Env): string {
-  // Tier 1: CF-Connecting-IP — direct client, set by Cloudflare, always correct
-  const cfIP = request.headers.get("CF-Connecting-IP");
-  if (cfIP && isValidIP(cfIP)) return cfIP;
-
-  // Tier 2 & 3: only trust proxy-set headers when secret is validated [P2]
-  if (isFromTrustedProxy(request, env)) {
-    // Tier 2: X-Real-IP — proxy sets this to original client IP
-    const realIP = request.headers.get("X-Real-IP");
-    if (realIP && isValidIP(realIP)) return realIP;
-
-    // Tier 3: X-Forwarded-For — first hop is the real client in standard setup
-    // Format: "client, proxy1, proxy2" — take leftmost (real client)
-    const xff = request.headers.get("X-Forwarded-For");
-    if (xff) {
-      const firstIP = xff.split(",")[0].trim();
-      if (firstIP && isValidIP(firstIP)) return firstIP;
-    }
-  }
-
-  // Fallback — should never reach here in CF Workers environment
-  return "unknown";
-}
-
 // ─── [3][S3] Prefetch link — only for VIDEO HLS segments ──────────────────────
 // [S3] Audio mux segments (.ts) must NOT be prefetched — causes PTS clock drift
-// Only enable for streams under a path that is clearly video-only (no /audio/)
-const SAFE_PATH_RE        = /^[a-zA-Z0-9._\-/]+$/;
+//      Only enable for streams under a path that is clearly video-only (no /audio/)
+const SAFE_PATH_RE         = /^[a-zA-Z0-9._\-/]+$/;
 const AUDIO_STREAM_PATH_RE = /\/(audio|vocals?|voice|speech|sound)\//i;
 
 function buildNextSegmentLink(pathname: string, isAudioOnlyStream: boolean): string | null {
@@ -282,13 +199,10 @@ function isBlockedUA(request: Request): boolean {
   return BLOCKED_UA_RE.test(ua);
 }
 
-// ─── [11][P3] Rate Limiting via KV — always uses real client IP ───────────────
-// [P3] resolveClientIP() ensures rate limit applies to real client even behind proxy.
-//      Without this, all proxy traffic counts as one IP → first user consumes limit.
+// ─── [11] Rate Limiting via KV ─────────────────────────────────────────────────
 async function isRateLimited(request: Request, env: Env): Promise<boolean> {
   try {
-    // [P3] Use real client IP — not proxy IP
-    const ip         = resolveClientIP(request, env);
+    const ip         = request.headers.get("CF-Connecting-IP") ?? "unknown";
     const key        = `ratelimit:${ip}`;
     const maxReq     = parseInt(env.RATE_LIMIT_MAX    ?? "100", 10);
     const windowSecs = parseInt(env.RATE_LIMIT_WINDOW ?? "60",  10);
@@ -297,7 +211,7 @@ async function isRateLimited(request: Request, env: Env): Promise<boolean> {
     await env.ULTRA_EDGE_KV.put(key, String(current + 1), { expirationTtl: windowSecs });
     return false;
   } catch {
-    return false;  // KV failure must never block traffic
+    return false;
   }
 }
 
@@ -307,28 +221,28 @@ async function isRateLimited(request: Request, env: Env): Promise<boolean> {
 //      Exception: manifests are never forced (origin may version them).
 function detectMediaContentType(pathname: string): string | null {
   const p = pathname.toLowerCase();
-  if (p.endsWith(".mp4"))                       return "video/mp4";
-  if (p.endsWith(".webm"))                      return "video/webm";
-  if (p.endsWith(".ts"))                        return "video/mp2t";
-  if (p.endsWith(".mkv"))                       return "video/x-matroska";
-  if (p.endsWith(".avi"))                       return "video/x-msvideo";
-  if (p.endsWith(".mov"))                       return "video/quicktime";
-  if (p.endsWith(".flac"))                      return "audio/flac";
-  if (p.endsWith(".wav"))                       return "audio/wav";
+  if (p.endsWith(".mp4"))                        return "video/mp4";
+  if (p.endsWith(".webm"))                       return "video/webm";
+  if (p.endsWith(".ts"))                         return "video/mp2t";
+  if (p.endsWith(".mkv"))                        return "video/x-matroska";
+  if (p.endsWith(".avi"))                        return "video/x-msvideo";
+  if (p.endsWith(".mov"))                        return "video/quicktime";
+  if (p.endsWith(".flac"))                       return "audio/flac";
+  if (p.endsWith(".wav"))                        return "audio/wav";
   if (p.endsWith(".aiff") || p.endsWith(".aif")) return "audio/aiff";
-  if (p.endsWith(".alac"))                      return "audio/mp4; codecs=alac";
-  if (p.endsWith(".mp3"))                       return "audio/mpeg";
-  if (p.endsWith(".aac"))                       return "audio/aac";
-  if (p.endsWith(".ogg"))                       return "audio/ogg";
-  if (p.endsWith(".opus"))                      return "audio/ogg; codecs=opus";
-  if (p.endsWith(".m4a"))                       return "audio/mp4";
-  if (p.endsWith(".weba"))                      return "audio/webm";
-  if (p.endsWith(".wma"))                       return "audio/x-ms-wma";
-  if (p.endsWith(".dsf"))                       return "audio/x-dsf";
-  if (p.endsWith(".dff"))                       return "audio/x-dff";
-  if (p.endsWith(".mqa"))                       return "audio/x-mqa";
-  if (p.endsWith(".m3u8"))                      return "application/vnd.apple.mpegurl";
-  if (p.endsWith(".mpd"))                       return "application/dash+xml";
+  if (p.endsWith(".alac"))                       return "audio/mp4; codecs=alac";
+  if (p.endsWith(".mp3"))                        return "audio/mpeg";
+  if (p.endsWith(".aac"))                        return "audio/aac";
+  if (p.endsWith(".ogg"))                        return "audio/ogg";
+  if (p.endsWith(".opus"))                       return "audio/ogg; codecs=opus";
+  if (p.endsWith(".m4a"))                        return "audio/mp4";
+  if (p.endsWith(".weba"))                       return "audio/webm";
+  if (p.endsWith(".wma"))                        return "audio/x-ms-wma";
+  if (p.endsWith(".dsf"))                        return "audio/x-dsf";
+  if (p.endsWith(".dff"))                        return "audio/x-dff";
+  if (p.endsWith(".mqa"))                        return "audio/x-mqa";
+  if (p.endsWith(".m3u8"))                       return "application/vnd.apple.mpegurl";
+  if (p.endsWith(".mpd"))                        return "application/dash+xml";
   return null;
 }
 
@@ -338,14 +252,14 @@ const AUDIO_EXT_RE    = /\.(mp3|aac|flac|ogg|opus|wav|m4a|weba|wma|aiff|aif|alac
 const LOSSLESS_EXT_RE = /\.(flac|wav|aiff|aif|alac|dsf|dff)$/i;
 
 function classifyPath(pathname: string) {
-  const isAudio          = AUDIO_EXT_RE.test(pathname);
-  const isVideo          = VIDEO_EXT_RE.test(pathname);
-  const isLossless       = LOSSLESS_EXT_RE.test(pathname);
-  const isHLS            = pathname.endsWith(".m3u8");
-  const isDASH           = pathname.endsWith(".mpd");
-  const isSegment        = pathname.endsWith(".ts");
-  const isMedia          = isVideo || isAudio || isSegment;
-  const isManifest       = isHLS || isDASH;
+  const isAudio           = AUDIO_EXT_RE.test(pathname);
+  const isVideo           = VIDEO_EXT_RE.test(pathname);
+  const isLossless        = LOSSLESS_EXT_RE.test(pathname);
+  const isHLS             = pathname.endsWith(".m3u8");
+  const isDASH            = pathname.endsWith(".mpd");
+  const isSegment         = pathname.endsWith(".ts");
+  const isMedia           = isVideo || isAudio || isSegment;
+  const isManifest        = isHLS || isDASH;
   // [S3] Detect audio-only stream paths
   const isAudioOnlyStream = isSegment && AUDIO_STREAM_PATH_RE.test(pathname);
   return {
@@ -446,12 +360,12 @@ function applySecurityHeaders(
 // ─── EQ Profile definitions ───────────────────────────────────────────────────
 interface EQProfile {
   name:         string;   // human-readable label
-  sub:          string;   // sub-bass  (<80Hz)   dB delta e.g. "+3"
+  sub:          string;   // sub-bass  (<80Hz)    dB delta e.g. "+3"
   bass:         string;   // bass      (80-300Hz) dB delta
   mids:         string;   // mids      (300Hz-3kHz) dB delta
-  highmid:      string;   // high-mid  (3-8kHz) dB delta
-  treble:       string;   // treble    (8-16kHz) dB delta
-  air:          string;   // air       (16kHz+) dB delta
+  highmid:      string;   // high-mid  (3-8kHz)   dB delta
+  treble:       string;   // treble    (8-16kHz)  dB delta
+  air:          string;   // air       (16kHz+)   dB delta
   spatial:      "stereo" | "surround" | "spatial" | "binaural";
   dynamicRange: string;
   latency:      string;
@@ -573,9 +487,9 @@ function detectContentMode(
   // ── Signal 1: Explicit X-Content-Mode header (highest priority) ───────────
   // Player app can declare mode directly — overrides all auto-detection
   const explicit = request.headers.get("X-Content-Mode")?.toLowerCase() ?? "";
-  if (explicit === "cinema"  || explicit === "movie")   return "cinema";
-  if (explicit === "gaming"  || explicit === "game")    return "gaming";
-  if (explicit === "podcast" || explicit === "voice")   return "podcast";
+  if (explicit === "cinema"  || explicit === "movie")        return "cinema";
+  if (explicit === "gaming"  || explicit === "game")         return "gaming";
+  if (explicit === "podcast" || explicit === "voice")        return "podcast";
   if (explicit === "music-hifi"   || explicit === "hifi")   return "music-hifi";
   if (explicit === "music-casual" || explicit === "music")  return "music-casual";
 
@@ -633,7 +547,7 @@ function applyAudioIntelligenceHeaders(
   headers.set("X-Audio-Quality", qualityHint);
 
   // [S8] Channel passthrough — only default to stereo if origin didn't specify
-  // Forcing stereo on mono source = wrong upmix = vocal detaches from music
+  //      Forcing stereo on mono source = wrong upmix = vocal detaches from music
   const originChannels = headers.get("X-Audio-Channels");
   if (!originChannels) {
     headers.set("X-Audio-Channels", "stereo");
@@ -679,19 +593,19 @@ function applyAudioIntelligenceHeaders(
   // Player apps read these to configure their DSP equaliser bands.
   // Values are dB delta strings: "+3", "0", "-2" etc.
   // Apps that don't support these headers ignore them gracefully.
-  headers.set("X-Audio-Profile",        profile.name);
-  headers.set("X-Audio-Mode",           mode);            // machine-readable mode
-  headers.set("X-Audio-EQ-Sub",         profile.sub);     // <80Hz
-  headers.set("X-Audio-EQ-Bass",        profile.bass);    // 80-300Hz
-  headers.set("X-Audio-EQ-Mids",        profile.mids);    // 300Hz-3kHz
-  headers.set("X-Audio-EQ-HighMid",     profile.highmid); // 3-8kHz
-  headers.set("X-Audio-EQ-Treble",      profile.treble);  // 8-16kHz
-  headers.set("X-Audio-EQ-Air",         profile.air);     // 16kHz+
-  headers.set("X-Audio-Spatial",        profile.spatial);
-  headers.set("X-Audio-Dynamic-Range",  profile.dynamicRange);
-  headers.set("X-Audio-Latency-Mode",   profile.latency);
-  headers.set("X-Audio-Buffer-Model",   profile.buffer);
-  headers.set("X-Audio-DSP-Engine",     profile.dspEngine);
+  headers.set("X-Audio-Profile",       profile.name);
+  headers.set("X-Audio-Mode",          mode);             // machine-readable mode
+  headers.set("X-Audio-EQ-Sub",        profile.sub);      // <80Hz
+  headers.set("X-Audio-EQ-Bass",       profile.bass);     // 80-300Hz
+  headers.set("X-Audio-EQ-Mids",       profile.mids);     // 300Hz-3kHz
+  headers.set("X-Audio-EQ-HighMid",    profile.highmid);  // 3-8kHz
+  headers.set("X-Audio-EQ-Treble",     profile.treble);   // 8-16kHz
+  headers.set("X-Audio-EQ-Air",        profile.air);      // 16kHz+
+  headers.set("X-Audio-Spatial",       profile.spatial);
+  headers.set("X-Audio-Dynamic-Range", profile.dynamicRange);
+  headers.set("X-Audio-Latency-Mode",  profile.latency);
+  headers.set("X-Audio-Buffer-Model",  profile.buffer);
+  headers.set("X-Audio-DSP-Engine",    profile.dspEngine);
 
   // ── [A8] Device-aware decoder hint ────────────────────────────────────────
   // Set AFTER profile — device hint is additive, not overriding
@@ -793,26 +707,7 @@ export default withSentry(
       };
 
       try {
-        // [P5] Build forwarded request — append real client IP to XFF chain
-        // This is the RFC 7239 standard for proxy chains:
-        //   "X-Forwarded-For: client, proxy1, proxy2"
-        const clientIP    = resolveClientIP(request, env);
-        const existingXFF = request.headers.get("X-Forwarded-For");
-        const xffValue    = existingXFF ? `${existingXFF}, ${clientIP}` : clientIP;
-
-        // Rebuild request with XFF added — cannot mutate incoming request directly
-        const proxiedRequest = new Request(request, {
-          headers: (() => {
-            const h = new Headers(request.headers);
-            h.set("X-Forwarded-For", xffValue);
-            h.set("X-Real-IP",       clientIP);
-            // Strip internal secret before forwarding to origin — never leak to upstream
-            h.delete("X-Internal-Service");
-            return h;
-          })(),
-        });
-
-        const originResponse = await fetch(proxiedRequest, cfConfig);
+        const originResponse = await fetch(request, cfConfig);
         const headers        = new Headers(originResponse.headers);
 
         // ── Security headers (no Vary yet — [S10]) ──────────────────────────
@@ -823,7 +718,7 @@ export default withSentry(
         const detectedType = detectMediaContentType(url.pathname);
         if (detectedType) {
           const currentType = headers.get("Content-Type") ?? "";
-          // Force override if: missing, or generic (octet-stream/binary), or manifest
+          // Force override if: missing, or generic (octet-stream/binary)
           const shouldForce =
             !currentType ||
             currentType.startsWith("application/octet-stream") ||
@@ -845,15 +740,16 @@ export default withSentry(
           headers.delete("Content-Encoding");
 
           // [S6] Transfer-Encoding: chunked + Range requests = wrong PTS on seek
-          // ONLY remove for non-live content — live segments need chunked for streaming
+          //      ONLY remove for non-live content — live segments need chunked for streaming
           if (!isLiveSegment) {
             headers.delete("Transfer-Encoding");
           }
 
           // [A4] Preserve Content-Length for DSP/player prebuffer calculation
           // [BUG-10 FIX] Guard: only set if value is a valid positive integer
-          // new Headers(originResponse.headers) already copies it, but Transfer-Encoding
-          // deletion above may have left a stale chunked response without Content-Length
+          //              new Headers(originResponse.headers) already copies it, but
+          //              Transfer-Encoding deletion above may have left a stale chunked
+          //              response without Content-Length
           const contentLength = originResponse.headers.get("Content-Length");
           if (contentLength && /^\d+$/.test(contentLength)) {
             headers.set("Content-Length", contentLength);
@@ -866,7 +762,7 @@ export default withSentry(
           }
 
           // [S4][A8] Decoder stabilization — codec params prevent Android AAC decoder
-          // from operating in generic mode which adds ~80ms decode latency
+          //          from operating in generic mode which adds ~80ms decode latency
           // [BUG-6 FIX] Use .includes() not === — Content-Type may have params suffix
           const ct = headers.get("Content-Type")?.toLowerCase() ?? "";
           if (ct.includes("audio/aac") && !ct.includes("codecs")) {
@@ -884,21 +780,21 @@ export default withSentry(
           }
 
           // [BT9] Downgrade strong ETags to weak for byte-range audio
-          // Strong ETag requires byte-identical response; partial content breaks that
+          //       Strong ETag requires byte-identical response; partial content breaks that
           const etag = originResponse.headers.get("ETag");
           if (etag && !etag.startsWith("W/")) {
             headers.set("ETag", `W/${etag}`);
           }
 
           // [A6][BT1–BT10][S8][S9] Audio Intelligence — MUST run last
-          // Sets X-Audio-Profile, X-Audio-Quality, X-Audio-Channels, X-Audio-Latency-Mode etc.
+          //   Sets X-Audio-Profile, X-Audio-Quality, X-Audio-Channels, X-Audio-Latency-Mode etc.
           // [BUG-1 FIX] Pass url.pathname — do NOT redeclare `url` inside isAudio block
           // [BUG-7 FIX] applyAudioIntelligenceHeaders() is authoritative for latency/profile
           //             — no manual X-Audio-Latency-Mode set before this call
           applyAudioIntelligenceHeaders(headers, request, isLossless, url.pathname);
 
           // NOTE: Vary is NOT set here — [S10][BUG-2][BUG-3 FIX]
-          // See [S10] block at end of handler — set ONCE, final value, after all headers done
+          //       See [S10] block at end of handler — set ONCE, final value, after all headers done
         }
 
         // ── Video/segment headers ───────────────────────────────────────────
@@ -928,7 +824,7 @@ export default withSentry(
         }
 
         // ── [S7] Expose CF-Cache-Status so player can detect cache miss ─────
-        // (CF sets this automatically — we just ensure it isn't stripped)
+        //    (CF sets this automatically — we just ensure it isn't stripped)
 
         // ── [S10] Vary — set ONCE, final value ─────────────────────────────
         // Audio and video use same Vary so CF caches them in same shard family
@@ -939,8 +835,8 @@ export default withSentry(
         }
 
         // ── Signature ───────────────────────────────────────────────────────
-        headers.set("X-Powered-By",        "FWG-UltraEdge");
-        headers.set("X-Worker-Version",    env.APP_VERSION);
+        headers.set("X-Powered-By",         "FWG-UltraEdge");
+        headers.set("X-Worker-Version",     env.APP_VERSION);
         headers.set("X-Worker-Environment", env.ENVIRONMENT);
 
         return new Response(originResponse.body, {
