@@ -101,8 +101,8 @@ APP_VERSION = "3.0.0-stg"
 
 [[env.staging.kv_namespaces]]
 binding    = "ULTRA_EDGE_KV"
-id         = "${KV_NAMESPACE_STAGING_ID}"
-preview_id = "${KV_NAMESPACE_PREVIEW_ID}"
+id         = "677028db1517494cbe971e34f22429a6"
+preview_id = "677028db1517494cbe971e34f22429a6"
 
 [[env.staging.r2_buckets]]
 binding     = "ULTRA_EDGE_VIDEOS"
