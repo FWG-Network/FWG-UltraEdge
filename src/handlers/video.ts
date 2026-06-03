@@ -1,5 +1,5 @@
 // FWG-UltraEdge 🌍⚡ — src/handlers/video.ts
-<<<<<<< Updated upstream
+ Updated upstream
 // 🔐 SECURITY HARDENED — FWG White-Hat Audit v5.0
 // Fixes:
 //   [FIX-7] Path traversal → decode + strict sanitize
@@ -138,7 +138,7 @@ export async function videoListHandler(env: Env): Promise<Response> {
       { error: "Internal Error" },
       { status: 500 }
     );
-=======
+
 import type { Env } from "../types/env";
 import { streamR2Video, detectMimeType, proxyLiveStream } from "../middleware/streaming";
 
@@ -160,6 +160,6 @@ export async function videoListHandler(env: Env): Promise<Response> {
     return Response.json({ count: videos.length, videos }, { status: 200, headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=30" } });
   } catch {
     return Response.json({ error: "Internal Error", message: "Failed to list videos" }, { status: 500 });
->>>>>>> Stashed changes
+ Stashed changes
   }
 }
