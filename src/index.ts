@@ -1,187 +1,140 @@
 // ============================================================
-// FWG Edge Worker — Production Grade
-// Fixes: template literal secret, HTTP-5xx fallback,
-//        per-type cacheTtl, cacheKey safety, retry logic,
-//        Range passthrough, health endpoint, request tracing
+// FWG Live Stream Edge Worker — Zero-Lag 1080p+
+// Optimized for HLS / DASH live & VOD over Cloudflare
 // ============================================================
 
 export interface Env {
-  PRIMARY_ORIGIN: string;
-  SECONDARY_ORIGIN: string;
+  BACKEND_URL: string;
   FWG_API_SECRET: string;
 }
 
-// ─── TTL constants ───────────────────────────────────────────
-const CACHE_TTL_VIDEO  = 31_536_000; // 1 year  — .ts / .m4s
-const CACHE_TTL_STATIC =     86_400; // 1 day   — default assets
-const CACHE_TTL_SHORT  =      3_600; // 1 hour  — everything else
+// ─── TTL ─────────────────────────────────────────────────────
+const TTL_SEGMENT  = 31_536_000; // 1 year  — .ts / .m4s  (immutable)
+const TTL_KEY_FRAME = 600;       // 10 min  — .vtt / .key / subtitles
+const TTL_SHORT     = 5;         // 5 sec   — .m3u8 / .mpd (live playlist)
 
-// ─── Helpers ─────────────────────────────────────────────────
+// ─── Content classification ───────────────────────────────────
 
-function isVideoSegment(pathname: string): boolean {
-  return pathname.endsWith(".ts") || pathname.endsWith(".m4s");
+type ContentKind = "manifest" | "segment" | "key" | "mp4" | "other";
+
+function classifyPath(pathname: string): ContentKind {
+  if (pathname.endsWith(".m3u8") || pathname.endsWith(".mpd"))  return "manifest";
+  if (pathname.endsWith(".ts")   || pathname.endsWith(".m4s"))  return "segment";
+  if (pathname.endsWith(".key")  || pathname.endsWith(".vtt"))  return "key";
+  if (pathname.endsWith(".mp4")  || pathname.endsWith(".webm")) return "mp4";
+  return "other";
 }
 
-function isManifest(pathname: string): boolean {
-  return pathname.endsWith(".m3u8") || pathname.endsWith(".mpd");
+// ─── Cache-Control per content kind ──────────────────────────
+
+function cacheControlHeader(kind: ContentKind): string {
+  switch (kind) {
+    case "manifest":
+      // Live playlists MUST be re-fetched every ~2s by the player
+      return "no-cache, no-store, must-revalidate";
+
+    case "segment":
+      // Segments are write-once / immutable — cache forever at edge & browser
+      return `public, max-age=${TTL_SEGMENT}, immutable`;
+
+    case "key":
+      // Encryption keys: cache briefly, don't expose too long
+      return `public, max-age=${TTL_KEY_FRAME}`;
+
+    case "mp4":
+      // Full MP4 direct play — allow range-based caching, no transform
+      return "public, max-age=3600, no-transform";
+
+    default:
+      return "public, max-age=60";
+  }
 }
 
-/**
- * Resolve the correct cache TTL based on the request path.
- */
-function resolveCacheTtl(pathname: string): number {
-  if (isVideoSegment(pathname)) return CACHE_TTL_VIDEO;
-  if (isManifest(pathname))     return 0; // never cache manifests at origin
-  return CACHE_TTL_STATIC;
+// ─── Cloudflare cf fetch options per content kind ────────────
+// This tells Cloudflare's own edge cache (different from Workers cache) what to do.
+
+function cfOptions(kind: ContentKind): RequestInitCfProperties {
+  switch (kind) {
+    case "segment":
+      return {
+        cacheEverything: true,
+        cacheTtl:        TTL_SEGMENT,
+        polish:          "off",   // never compress video binary
+        mirage:          false,
+        minify:          { javascript: false, css: false, html: false },
+      };
+
+    case "manifest":
+      return {
+        cacheEverything: true,
+        cacheTtl:        TTL_SHORT,   // Cloudflare edge caches for 5s only
+        polish:          "off",
+        mirage:          false,
+      };
+
+    case "mp4":
+      return {
+        cacheEverything: true,
+        cacheTtl:        3600,
+        polish:          "off",
+        mirage:          false,
+      };
+
+    default:
+      return {
+        cacheEverything: false,
+        polish:          "lossy",
+        mirage:          true,
+      };
+  }
 }
 
-/**
- * Build a normalised, method-safe cache key.
- * Only GET / HEAD requests are cacheable; strip auth headers
- * so they never become part of the key.
- */
-function buildCacheKey(request: Request): Request {
-  const url = new URL(request.url);
-  // Normalise: lowercase pathname, drop unstable query params if needed
-  const key = new URL(url.pathname.toLowerCase() + url.search, url.origin);
-  return new Request(key.toString(), { method: "GET" });
-}
+// ─── Build streaming response headers ────────────────────────
 
-/**
- * Generate a short request-ID for tracing across logs.
- */
-function requestId(): string {
-  return crypto.randomUUID().slice(0, 8);
-}
-
-// ─── Origin fetch ─────────────────────────────────────────────
-
-async function fetchFromOrigin(
-  request: Request,
-  env: Env,
-  origin: string,
-  cacheTtl: number,
+function buildResponseHeaders(
+  origin: Headers,
+  kind: ContentKind,
   rid: string
-): Promise<Response> {
-  const incoming = new URL(request.url);
-  const target   = new URL(incoming.pathname + incoming.search, origin);
+): Headers {
+  const h = new Headers(origin);
 
-  const headers = new Headers(request.headers);
+  // CORS — required for HLS.js / video.js / Shaka player in browser
+  h.set("Access-Control-Allow-Origin",  "*");
+  h.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, X-Request-ID");
 
-  // ✅ FIX #1 — was "Bearer ${env.FWG_API_SECRET}" (plain string)
-  if (env.FWG_API_SECRET) {
-    headers.set("Authorization", `Bearer ${env.FWG_API_SECRET}`);
+  // Byte-range support — critical for video seeking and adaptive bitrate
+  h.set("Accept-Ranges", "bytes");
+
+  // Cache policy
+  h.set("Cache-Control", cacheControlHeader(kind));
+
+  // Live stream: disable Nginx-style proxy buffering on any upstream
+  if (kind === "manifest" || kind === "segment") {
+    h.set("X-Accel-Buffering", "no");
   }
 
-  headers.set("X-Forwarded-Proto", "https");
-  headers.set("X-Request-ID",      rid);
-  headers.delete("host"); // let fetch set the correct Host header
+  // Security
+  h.set("X-Content-Type-Options", "nosniff");
+  h.set("X-Request-ID",           rid);
 
-  const proxyRequest = new Request(target.toString(), {
-    method:  request.method,
-    headers,
-    // Stream the body through for POST/PUT (not typical for media, but correct)
-    body:    ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
-    redirect: "follow",
-  });
+  // Remove headers that can break streaming
+  h.delete("content-encoding"); // don't double-encode
+  h.delete("transfer-encoding"); // let Workers handle this
 
-  return fetch(proxyRequest, {
-    cf: {
-      cacheEverything: cacheTtl > 0,
-      cacheTtl:        cacheTtl > 0 ? cacheTtl : undefined,
-      // Lossy polish only makes sense for images, not video segments
-      polish:          isVideoSegment(incoming.pathname.toLowerCase()) ? "off" : "lossy",
-      mirage:          true,
-    },
-  });
+  return h;
 }
 
-// ─── Fallback logic ───────────────────────────────────────────
+// ─── Safe cache key (GET-only, no auth headers in key) ───────
 
-/**
- * Try PRIMARY, fall back to SECONDARY on:
- *   • network error (exception)          ← was already handled
- *   • HTTP 5xx from origin               ← ✅ FIX #2 — was missing
- */
-async function fetchWithFallback(
-  request: Request,
-  env: Env,
-  cacheTtl: number,
-  rid: string
-): Promise<Response> {
-  let response: Response;
-
-  // ── Primary ──────────────────────────────────────────────
-  try {
-    response = await fetchFromOrigin(request, env, env.PRIMARY_ORIGIN, cacheTtl, rid);
-
-    // ✅ FIX #2 — fall through to secondary on upstream server errors
-    if (response.status >= 500) {
-      console.warn(`[${rid}] Primary returned ${response.status}, trying secondary`);
-      throw new Error(`Primary HTTP ${response.status}`);
-    }
-
-    return response;
-  } catch (err) {
-    console.warn(`[${rid}] Primary failed: ${(err as Error).message}`);
-  }
-
-  // ── Secondary ─────────────────────────────────────────────
-  try {
-    response = await fetchFromOrigin(request, env, env.SECONDARY_ORIGIN, cacheTtl, rid);
-
-    if (response.status >= 500) {
-      throw new Error(`Secondary HTTP ${response.status}`);
-    }
-
-    return response;
-  } catch (err) {
-    console.error(`[${rid}] Secondary failed: ${(err as Error).message}`);
-    throw new Error("all_origins_down");
-  }
+function safeCacheKey(request: Request): Request {
+  const u = new URL(request.url);
+  const normalised = new URL(u.pathname.toLowerCase() + u.search, u.origin);
+  return new Request(normalised.toString(), { method: "GET" });
 }
 
-// ─── Security headers ─────────────────────────────────────────
+// ─── Request ID ───────────────────────────────────────────────
 
-/**
- * Merge security headers onto the response.
- * Does NOT overwrite a more-restrictive ACAO from the origin.
- */
-function applySecurityHeaders(response: Response, rid: string): Response {
-  const headers = new Headers(response.headers);
-
-  // Only set wildcard CORS if origin didn't already set a stricter value
-  if (!headers.has("Access-Control-Allow-Origin")) {
-    headers.set("Access-Control-Allow-Origin", "*");
-  }
-
-  headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
-  headers.set("X-Content-Type-Options",    "nosniff");
-  headers.set("Referrer-Policy",           "strict-origin-when-cross-origin");
-  headers.set("X-Frame-Options",           "DENY");
-  headers.set("X-Request-ID",              rid);
-
-  return new Response(response.body, {
-    status:     response.status,
-    statusText: response.statusText,
-    headers,
-  });
-}
-
-// ─── Cache-Control per content type ──────────────────────────
-
-function applyCacheControl(headers: Headers, pathname: string): void {
-  if (isManifest(pathname)) {
-    // Manifests must always be fresh — never cache
-    headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
-    headers.set("Pragma", "no-cache");
-  } else if (isVideoSegment(pathname)) {
-    // Segments are immutable — aggressive caching
-    headers.set("Cache-Control", `public, max-age=${CACHE_TTL_VIDEO}, immutable`);
-  } else {
-    headers.set("Cache-Control", `public, max-age=${CACHE_TTL_SHORT}`);
-  }
-}
+const rid = (): string => crypto.randomUUID().slice(0, 8);
 
 // ─── Main handler ─────────────────────────────────────────────
 
@@ -192,25 +145,20 @@ export default {
     ctx: ExecutionContext
   ): Promise<Response> {
 
-    const rid      = requestId();
+    const id       = rid();
     const url      = new URL(request.url);
     const pathname = url.pathname.toLowerCase();
+    const kind     = classifyPath(pathname);
 
-    // ── Health check ────────────────────────────────────────
+    // ── Health check ─────────────────────────────────────────
     if (pathname === "/health" || pathname === "/_fwg/health") {
-      return new Response(
-        JSON.stringify({ status: "ok", rid, ts: Date.now() }),
-        {
-          headers: {
-            "Content-Type":  "application/json",
-            "Cache-Control": "no-store",
-            "X-Request-ID":  rid,
-          },
-        }
+      return Response.json(
+        { status: "ok", rid: id, ts: Date.now(), version: "2.0.0" },
+        { headers: { "Cache-Control": "no-store", "X-Request-ID": id } }
       );
     }
 
-    // ── CORS preflight ──────────────────────────────────────
+    // ── CORS Preflight ───────────────────────────────────────
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -219,12 +167,12 @@ export default {
           "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type, Range, Authorization",
           "Access-Control-Max-Age":       "86400",
-          "X-Request-ID":                 rid,
+          "X-Request-ID":                 id,
         },
       });
     }
 
-    // ── Only GET / HEAD supported downstream ───────────────
+    // ── Reject non-GET/HEAD ──────────────────────────────────
     if (!["GET", "HEAD"].includes(request.method)) {
       return new Response("Method Not Allowed", {
         status: 405,
@@ -232,60 +180,93 @@ export default {
       });
     }
 
-    // ── Worker-level cache (video segments only) ────────────
+    // ── Worker Cache — serve segments instantly from edge ────
+    // Workers Cache API is per-datacenter: viewer in Singapore hits
+    // Singapore PoP, not your origin.  This is the main lag killer.
     const cache    = caches.default;
-    const cacheKey = buildCacheKey(request);
-    const cacheTtl = resolveCacheTtl(pathname); // ✅ FIX #3
+    const cacheKey = safeCacheKey(request);
 
-    if (isVideoSegment(pathname)) {
+    if (kind === "segment") {
       const cached = await cache.match(cacheKey);
       if (cached) {
         const h = new Headers(cached.headers);
         h.set("X-Cache",      "HIT");
-        h.set("X-Request-ID", rid);
-        return new Response(cached.body, {
-          status:  cached.status,
-          headers: h,
-        });
+        h.set("X-Request-ID", id);
+        return new Response(cached.body, { status: cached.status, headers: h });
       }
     }
 
-    // ── Fetch from origin(s) ────────────────────────────────
+    // ── Build proxy request ──────────────────────────────────
+    const backendBase = env.BACKEND_URL || "https://fallback.fwg.internal";
+    const targetUrl   = new URL(url.pathname + url.search, backendBase);
+
+    const proxyHeaders = new Headers();
+
+    // Pass through ONLY safe, relevant headers — not cookies, not host
+    for (const key of ["range", "if-range", "if-none-match", "if-modified-since", "accept", "accept-encoding", "user-agent"]) {
+      const val = request.headers.get(key);
+      if (val) proxyHeaders.set(key, val);
+    }
+
+    proxyHeaders.set("X-Forwarded-Proto", "https");
+    proxyHeaders.set("X-Request-ID",      id);
+
+    if (env.FWG_API_SECRET) {
+      proxyHeaders.set("Authorization", `Bearer ${env.FWG_API_SECRET}`);
+    }
+
+    const proxyRequest = new Request(targetUrl.toString(), {
+      method:  request.method,
+      headers: proxyHeaders,
+      redirect: "follow",
+    });
+
+    // ── Fetch from backend ───────────────────────────────────
     let originResponse: Response;
 
     try {
-      originResponse = await fetchWithFallback(request, env, cacheTtl, rid);
-    } catch {
-      return new Response(
-        JSON.stringify({ error: "FWG Edge: all origins unavailable", rid }),
+      originResponse = await fetch(proxyRequest, { cf: cfOptions(kind) });
+    } catch (err) {
+      console.error(`[${id}] Backend unreachable: ${(err as Error).message}`);
+      return Response.json(
+        { error: "FWG Edge: Backend offline or too slow", rid: id },
         {
-          status:  503,
-          headers: {
-            "Content-Type":  "application/json",
-            "Retry-After":   "30",
-            "X-Request-ID":  rid,
-          },
+          status:  504,
+          headers: { "Retry-After": "5", "X-Request-ID": id },
         }
       );
     }
 
-    // ── Build final response with correct Cache-Control ─────
-    const headers = new Headers(originResponse.headers);
-    applyCacheControl(headers, pathname);
-    headers.set("X-Cache",      "MISS");
-    headers.set("X-Request-ID", rid);
+    // ── Non-2xx passthrough (don't cache errors) ─────────────
+    if (!originResponse.ok && originResponse.status !== 206) {
+      return new Response(originResponse.body, {
+        status:     originResponse.status,
+        statusText: originResponse.statusText,
+        headers:    new Headers({
+          "Content-Type": originResponse.headers.get("Content-Type") ?? "text/plain",
+          "X-Request-ID": id,
+          "X-Cache":      "BYPASS",
+        }),
+      });
+    }
+
+    // ── Build final streaming response ───────────────────────
+    const responseHeaders = buildResponseHeaders(originResponse.headers, kind, id);
+    responseHeaders.set("X-Cache", "MISS");
 
     const finalResponse = new Response(originResponse.body, {
-      status:     originResponse.status,
+      status:     originResponse.status,  // preserves 206 Partial Content for Range
       statusText: originResponse.statusText,
-      headers,
+      headers:    responseHeaders,
     });
 
-    // ── Store segments in Worker cache ──────────────────────
-    if (isVideoSegment(pathname) && originResponse.ok) {
+    // ── Store segment in Workers Cache (background) ──────────
+    // ctx.waitUntil: doesn't block the stream — response flows immediately,
+    // cache write happens in parallel so next viewer gets HIT.
+    if (kind === "segment" && originResponse.ok) {
       ctx.waitUntil(cache.put(cacheKey, finalResponse.clone()));
     }
 
-    return applySecurityHeaders(finalResponse, rid);
+    return finalResponse;
   },
 };
