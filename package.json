@@ -41,3 +41,8 @@
   },
   "type": "module"
 }
+{
+  "devDependencies": {
+    "wrangler": "^11.16.0"
+  }
+}
