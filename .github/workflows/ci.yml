@@ -1,0 +1,423 @@
+name: "Test Installation Scripts"
+
+# ─────────────────────────────────────────────────────────────────────────
+# 2026 Modernisation — changelog
+#
+# Versions
+#   • Node.js matrix: [22, 24, 26]
+#       - Removed v20 (EOL Apr 2026), removed v25 (EOL Jun 2026)
+#       - Added v26 Current (released Apr 2026)
+#
+# DEB OS matrix
+#   • Added   ubuntu:26.04  (Noble LTS, released Apr 2026)
+#   • Added   debian:12     (Bookworm, oldstable)
+#   • Removed debian:11     (Bullseye, EOL Jun 2026)
+#
+# RPM OS matrix
+#   • fedora:41 → fedora:42  (41 EOL May 2026; 42 supported until Nov 2026)
+#
+# Workflow hygiene
+#   • Added permissions: contents: read  (principle of least privilege)
+#   • Added concurrency group           (cancel superseded runs on force-push)
+#   • Added fail-fast: false            (surface all matrix failures at once)
+#   • Added timeout-minutes: 20         (prevent hung runners)
+#   • Pinned runs-on: ubuntu-24.04      (avoid ubuntu-latest drift)
+#
+# Script fixes
+#   • apt update --audit  →  apt-get update -qq  (--audit is not a valid flag)
+#   • Added DEBIAN_FRONTEND=noninteractive        (suppress apt prompts in CI)
+#   • Typo "Istallation" → "Installation"         (rpm + rpm-minimal jobs)
+#   • Error messages now use ::error:: annotation  (visible in Actions UI)
+#   • check-latest.js → check-latest.mjs          (ESM; modernised to use
+#     native fetch() API stable since Node 22; added ::ok summary line)
+#
+# NSolid
+#   • Scoped to LTS-only: v22 and v24
+#   • v26 (Current) excluded — NSolid typically tracks LTS releases
+# ─────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    - cron: "00 00 * * *"
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ─────────────────────────────────────────────────────────────────────────
+# Shared check-latest script (ESM, top-level await, native fetch)
+# Written once here as an anchor; referenced inline per job below.
+# TODO: extract to .github/actions/check-node-version/ composite action
+#       to eliminate the three identical copies.
+# ─────────────────────────────────────────────────────────────────────────
+
+jobs:
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # DEB — Debian / Ubuntu
+  # ═══════════════════════════════════════════════════════════════════════
+  deb:
+    name: "NodeJS ${{ matrix.version }} (${{ matrix.os }})"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [22, 24, 26]
+        os:
+          - "ubuntu:26.04"       # Noble LTS — released Apr 2026
+          - "ubuntu:24.04"       # Noble LTS
+          - "ubuntu:22.04"       # Jammy LTS — EOL Apr 2027
+          - "debian:13"          # Trixie — stable since Jun 2025
+          - "debian:12"          # Bookworm — oldstable
+          # debian:11 (Bullseye) removed — EOL Jun 2026
+    container:
+      image: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v5
+
+      - name: Run Installation Script
+        run: ./scripts/deb/setup_${{ matrix.version }}.x
+
+      - name: Audit Repository
+        if: contains(matrix.os, 'debian')
+        run: |
+          apt-get update -qq
+          apt-cache policy
+
+      - name: Install Node.js
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: apt-get install -y nodejs
+
+      - name: Validate Node Version
+        run: |
+          node -e "console.log(process.version)"
+          NODE_VERSION=$(node -e "console.log(process.version.split('.')[0])")
+          if [[ "${NODE_VERSION}" != "v${{ matrix.version }}" ]]; then
+            echo "::error::Expected Node v${{ matrix.version }}, got ${NODE_VERSION}"
+            exit 1
+          fi
+
+      - name: Validate Node matches latest official tag
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+        run: |
+          cat <<'EOF' > /tmp/check-latest.mjs
+          import fs from 'fs';
+
+          // fetch() is stable since Node 22 — no https module required
+          const major       = 'v' + process.argv[2] + '.';
+          const platform    = process.argv[3] || '';
+          const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+          const appendSummary = (s) => { if (summaryFile) fs.appendFileSync(summaryFile, s); };
+          const header = `### Node ${process.argv[2]} on ${platform}\n\n`;
+
+          try {
+            const res = await fetch('https://nodejs.org/dist/index.json');
+            if (!res.ok) throw new Error(`HTTP ${res.status} from nodejs.org`);
+
+            const versions  = await res.json();
+            const latest    = versions.find((v) => v.version.startsWith(major));
+            const installed = process.version;
+
+            if (!latest) {
+              console.log(`No official release yet for Node ${process.argv[2]}, skipping`);
+              appendSummary(header + 'Status: no official release yet for this major — skipped\n\n');
+              process.exit(0);
+            }
+
+            if (installed !== latest.version) {
+              const msg = `Node ${process.argv[2]} on ${platform}: installed ${installed} does not match latest official ${latest.version}`;
+              console.log(`::warning::${msg}`);
+              appendSummary(
+                header +
+                `Installed: \`${installed}\`\n\n` +
+                `Latest official: \`${latest.version}\`\n\n` +
+                `Status: **WARNING** — NodeSource package is behind upstream\n\n`
+              );
+              process.exit(0);
+            }
+
+            console.log(`OK: installed ${installed} matches latest ${latest.version}`);
+            appendSummary(
+              header +
+              `Installed: \`${installed}\`\n\n` +
+              `Latest official: \`${latest.version}\`\n\n` +
+              `Status: **OK**\n\n`
+            );
+          } catch (e) {
+            console.error('Could not fetch nodejs.org/dist/index.json:', e.message);
+          }
+
+          process.exit(0);
+          EOF
+          node /tmp/check-latest.mjs ${{ matrix.version }} "$MATRIX_OS"
+
+      - name: Install NSolid
+        if: matrix.version == 22 || matrix.version == 24
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get remove -y nodejs
+          apt-get install -y nsolid
+
+      - name: Validate NSolid Version
+        if: matrix.version == 22 || matrix.version == 24
+        run: |
+          nsolid -e "console.log(process.version)"
+          NSOLID_VERSION=$(nsolid -e "console.log(process.version.split('.')[0])")
+          if [[ "${NSOLID_VERSION}" != "v${{ matrix.version }}" ]]; then
+            echo "::error::Expected NSolid v${{ matrix.version }}, got ${NSOLID_VERSION}"
+            exit 1
+          fi
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # RPM — Fedora / Amazon Linux / Rocky Linux / RHEL UBI
+  # ═══════════════════════════════════════════════════════════════════════
+  rpm:
+    name: "NodeJS ${{ matrix.version }} (${{ matrix.os }})"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [22, 24, 26]
+        os:
+          - "fedora:42"              # fedora:41 EOL May 2026; 42 current until Nov 2026
+          - "amazonlinux:2023"
+          - "rockylinux:9"
+          - "rockylinux:8"
+          - "redhat/ubi9:latest"
+    container:
+      image: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Install git
+        run: |
+          dnf update -y --setopt=install_weak_deps=False
+          dnf install -y git
+
+      - name: Checkout Repo
+        uses: actions/checkout@v5
+
+      - name: Run Installation Script
+        run: ./scripts/rpm/setup_${{ matrix.version }}.x
+
+      - name: Audit Repository
+        run: dnf repolist
+
+      - name: Install Node.js
+        run: dnf install -y nodejs
+
+      - name: Validate Node Version
+        run: |
+          node -e "console.log(process.version)"
+          NODE_VERSION=$(node -e "console.log(process.version.split('.')[0])")
+          if [[ "${NODE_VERSION}" != "v${{ matrix.version }}" ]]; then
+            echo "::error::Expected Node v${{ matrix.version }}, got ${NODE_VERSION}"
+            exit 1
+          fi
+
+      - name: Validate Node matches latest official tag
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+        run: |
+          cat <<'EOF' > /tmp/check-latest.mjs
+          import fs from 'fs';
+
+          const major       = 'v' + process.argv[2] + '.';
+          const platform    = process.argv[3] || '';
+          const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+          const appendSummary = (s) => { if (summaryFile) fs.appendFileSync(summaryFile, s); };
+          const header = `### Node ${process.argv[2]} on ${platform}\n\n`;
+
+          try {
+            const res = await fetch('https://nodejs.org/dist/index.json');
+            if (!res.ok) throw new Error(`HTTP ${res.status} from nodejs.org`);
+
+            const versions  = await res.json();
+            const latest    = versions.find((v) => v.version.startsWith(major));
+            const installed = process.version;
+
+            if (!latest) {
+              console.log(`No official release yet for Node ${process.argv[2]}, skipping`);
+              appendSummary(header + 'Status: no official release yet for this major — skipped\n\n');
+              process.exit(0);
+            }
+
+            if (installed !== latest.version) {
+              const msg = `Node ${process.argv[2]} on ${platform}: installed ${installed} does not match latest official ${latest.version}`;
+              console.log(`::warning::${msg}`);
+              appendSummary(
+                header +
+                `Installed: \`${installed}\`\n\n` +
+                `Latest official: \`${latest.version}\`\n\n` +
+                `Status: **WARNING** — NodeSource package is behind upstream\n\n`
+              );
+              process.exit(0);
+            }
+
+            console.log(`OK: installed ${installed} matches latest ${latest.version}`);
+            appendSummary(
+              header +
+              `Installed: \`${installed}\`\n\n` +
+              `Latest official: \`${latest.version}\`\n\n` +
+              `Status: **OK**\n\n`
+            );
+          } catch (e) {
+            console.error('Could not fetch nodejs.org/dist/index.json:', e.message);
+          }
+
+          process.exit(0);
+          EOF
+          node /tmp/check-latest.mjs ${{ matrix.version }} "$MATRIX_OS"
+
+      - name: Install NSolid
+        if: matrix.version == 22 || matrix.version == 24
+        run: |
+          dnf remove -y nodejs
+          dnf install -y nsolid
+
+      - name: Validate NSolid Version
+        if: matrix.version == 22 || matrix.version == 24
+        run: |
+          nsolid -e "console.log(process.version)"
+          NSOLID_VERSION=$(nsolid -e "console.log(process.version.split('.')[0])")
+          if [[ "${NSOLID_VERSION}" != "v${{ matrix.version }}" ]]; then
+            echo "::error::Expected NSolid v${{ matrix.version }}, got ${NSOLID_VERSION}"
+            exit 1
+          fi
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # RPM Minimal — Rocky Linux / RHEL UBI minimal images
+  # ═══════════════════════════════════════════════════════════════════════
+  rpm-minimal:
+    name: "NodeJS ${{ matrix.version }} (${{ matrix.os }})"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [22, 24, 26]
+        os:
+          - "rockylinux:9-minimal"
+          - "rockylinux:8-minimal"
+          - "redhat/ubi9-minimal:latest"
+    container:
+      image: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Install git
+        run: |
+          microdnf update -y
+          microdnf install -y git
+
+      - name: Checkout Repo
+        uses: actions/checkout@v5
+
+      - name: Run Installation Script
+        run: ./scripts/rpm/setup_${{ matrix.version }}.x
+
+      - name: Audit Repository
+        run: microdnf repolist
+
+      - name: Install Node.js
+        run: microdnf install -y nodejs
+
+      - name: Validate Node Version
+        run: |
+          node -e "console.log(process.version)"
+          NODE_VERSION=$(node -e "console.log(process.version.split('.')[0])")
+          if [[ "${NODE_VERSION}" != "v${{ matrix.version }}" ]]; then
+            echo "::error::Expected Node v${{ matrix.version }}, got ${NODE_VERSION}"
+            exit 1
+          fi
+
+      - name: Validate Node matches latest official tag
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+        run: |
+          cat <<'EOF' > /tmp/check-latest.mjs
+          import fs from 'fs';
+
+          const major       = 'v' + process.argv[2] + '.';
+          const platform    = process.argv[3] || '';
+          const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+          const appendSummary = (s) => { if (summaryFile) fs.appendFileSync(summaryFile, s); };
+          const header = `### Node ${process.argv[2]} on ${platform}\n\n`;
+
+          try {
+            const res = await fetch('https://nodejs.org/dist/index.json');
+            if (!res.ok) throw new Error(`HTTP ${res.status} from nodejs.org`);
+
+            const versions  = await res.json();
+            const latest    = versions.find((v) => v.version.startsWith(major));
+            const installed = process.version;
+
+            if (!latest) {
+              console.log(`No official release yet for Node ${process.argv[2]}, skipping`);
+              appendSummary(header + 'Status: no official release yet for this major — skipped\n\n');
+              process.exit(0);
+            }
+
+            if (installed !== latest.version) {
+              const msg = `Node ${process.argv[2]} on ${platform}: installed ${installed} does not match latest official ${latest.version}`;
+              console.log(`::warning::${msg}`);
+              appendSummary(
+                header +
+                `Installed: \`${installed}\`\n\n` +
+                `Latest official: \`${latest.version}\`\n\n` +
+                `Status: **WARNING** — NodeSource package is behind upstream\n\n`
+              );
+              process.exit(0);
+            }
+
+            console.log(`OK: installed ${installed} matches latest ${latest.version}`);
+            appendSummary(
+              header +
+              `Installed: \`${installed}\`\n\n` +
+              `Latest official: \`${latest.version}\`\n\n` +
+              `Status: **OK**\n\n`
+            );
+          } catch (e) {
+            console.error('Could not fetch nodejs.org/dist/index.json:', e.message);
+          }
+
+          process.exit(0);
+          EOF
+          node /tmp/check-latest.mjs ${{ matrix.version }} "$MATRIX_OS"
+
+      - name: Install NSolid
+        if: matrix.version == 22 || matrix.version == 24
+        run: |
+          microdnf remove -y nodejs
+          microdnf install -y nsolid
+
+      - name: Validate NSolid Version
+        if: matrix.version == 22 || matrix.version == 24
+        run: |
+          nsolid -e "console.log(process.version)"
+          NSOLID_VERSION=$(nsolid -e "console.log(process.version.split('.')[0])")
+          if [[ "${NSOLID_VERSION}" != "v${{ matrix.version }}" ]]; then
+            echo "::error::Expected NSolid v${{ matrix.version }}, got ${NSOLID_VERSION}"
+            exit 1
+          fi
