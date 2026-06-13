@@ -3,7 +3,7 @@ import { Router } from "itty-router";
 import type { Env } from "../types/env";
 import { healthHandler } from "../handlers/health";
 import { videoHandler, liveStreamHandler, videoListHandler } from "../handlers/video";
-import { kvHandler } from "../handlers/kv";
+import { kvGetHandler } from "../handlers/kv";
 import { getAccountInfo } from "../providers/cloudflare";
 
 export const router = Router();
