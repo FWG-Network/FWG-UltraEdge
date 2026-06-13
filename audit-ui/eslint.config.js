@@ -3,7 +3,7 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
 
 export default [
   {
-    ignores: ["cinema-worker/**"],  // ← ADD
+    ignores: ["cinema-worker/src"],  // ← ADD
   },
   {
     files: ["**/*.ts", "**/*.tsx", "**/*.js"],
