@@ -10,7 +10,7 @@ export const router = Router();
 
 router.get("/health", (req: Request, env: Env) => healthHandler(req, env));
 router.get("/api/config", (_req: Request, env: Env) => Response.json(getAccountInfo(env), { status: 200 }));
-router.get("/api/kv/:key", (req: Request & { params: Record<string,string> }, env: Env) => kvGetHandler(req.params.key, env));
+router.get("/api/kv/:key", (req: Request & { params: Record<string,string> }, env: Env) => kvGetHandler(req, env, req.params.key));
 router.get("/api/video", (_req: Request, env: Env) => videoListHandler(env));
 router.get("/api/video/:filename", (req: Request & { params: Record<string,string> }, env: Env) => videoHandler(req, env, req.params.filename));
 router.get("/api/live/:path", (req: Request & { params: Record<string,string> }, env: Env) => liveStreamHandler(req, env, req.params.path));
