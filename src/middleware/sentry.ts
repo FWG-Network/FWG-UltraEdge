@@ -90,26 +90,26 @@ export async function captureError(
       },
     },
     exception: {
-      values: [
-        {
-          type: error.name,
-          value: error.message,
-          stacktrace: error.stack
-            ? {
-                frames: error.stack
-                  .split("\n")
-                  .slice(1)
-                  .map((line) => ({
-                    filename: line.trim().split(" ")[1] ?? "unknown",
-                    function: line.trim().split(" ")[0] ?? "unknown",
-                  })),
-              }
-            : undefined,
-        },
-      ],
+  values: [
+    {
+      type: error.name,
+      value: error.message,
+      ...(error.stack
+        ? {
+            stacktrace: {
+              frames: error.stack
+                .split("\n")
+                .slice(1)
+                .map((line) => ({
+                  filename: line.trim().split(" ")[1] ?? "unknown",
+                  function: line.trim().split(" ")[0] ?? "unknown",
+                })),
+            },
+          }
+        : {}),
     },
-  });
-}
+  ],
+},
 
 // ── Capture message ──
 export async function captureMessage(
