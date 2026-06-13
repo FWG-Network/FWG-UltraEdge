@@ -3,10 +3,10 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
 
 export default [
   {
-    ignores: ["cinema-worker/"],  // ← ADD
+    ignores: ["cinema-worker/src"],  // ← ADD
   },
   {
-    files: ["src/index.ts", "src/highbanwidth.js", "src/cinematic-hub.js"], 
+    files: ["cinema-worker/src/index.ts", "cinema-worker/src/highbanwidth.js", "cinema-worker/src/cinematic-hub.js"], 
     languageOptions: {
       parser: tsParser,
     },
