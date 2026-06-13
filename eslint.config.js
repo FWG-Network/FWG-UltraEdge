@@ -3,6 +3,9 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
 
 export default [
   {
+    ignores: ["cinema-worker/**"],  // ← ADD
+  },
+  {
     files: ["**/*.ts", "**/*.tsx", "**/*.js"],
     languageOptions: {
       parser: tsParser,
