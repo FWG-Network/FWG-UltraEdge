@@ -129,7 +129,7 @@ function FindProxyForURL(url, host) {
     // 4. Cloudflare Anycast backup
     // =========================
     return (
-        PROXY 104.19.237.150; PROXY 104.16.132.229; PROXY 172.16.0.1; PROXY 172.64.145.121; PROXY 104.19.237.150; PROXY 172.64.36.1;
+        PROXY 104.19.237.150:443; PROXY 104.16.132.229:443; PROXY 172.16.0.1:443; PROXY 172.64.145.121:443; PROXY 104.19.237.150:443; PROXY 172.64.36.1:443;
         "DIRECT";
     );
 }
