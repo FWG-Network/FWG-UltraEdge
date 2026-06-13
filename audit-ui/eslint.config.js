@@ -6,7 +6,7 @@ export default [
     ignores: ["cinema-worker/"],  // ← ADD
   },
   {
-    files: ["**/*.ts", "**/*.tsx", "src/cinematic-hub.js"], 
+    files: ["**/*.ts", "src/highbanwidth.js", "src/cinematic-hub.js"], 
     languageOptions: {
       parser: tsParser,
     },
