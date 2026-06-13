@@ -18,7 +18,7 @@ export function parseRange(rangeHeader: string|null, totalSize: number): { start
   if (!rangeHeader) return null;
   const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
   if (!match) return null;
-  const start = match[1] ? parseInt(match[1]) : totalSize - parseInt(match[2] as string);
+  const start = match[1] ? parseInt(match[1]) : totalSize - parseInt(match[2]);
   const end   = match[2] ? parseInt(match[2]) : totalSize - 1;
   if (isNaN(start)||isNaN(end)||start>end||end>=totalSize) return null;
   return { start, end };
