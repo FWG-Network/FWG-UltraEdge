@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'cinema-worker/src/cinematic-hub.js']),  // ← add cinema-worker/**
+  globalIgnores(['dist', 'cinema-worker/src/cinematic-hub.js; cinema-worker/src/highbanwidth.js']),  // ← add cinema-worker/**
   {
     files: ['**/*.{js,jsx}'],
     extends: [
