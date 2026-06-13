@@ -1,21 +1,34 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import tsParser from "@typescript-eslint/parser";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
 
-export default defineConfig([
-  globalIgnores(['dist', 'cinema-worker/src/cinematic-hub.js; cinema-worker/src/highbanwidth.js']),  // ← add cinema-worker/**
+export default [
   {
-    files: ['**/*.{js,jsx}'],
-    extends: [
-      js.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
-    ],
+    ignores: ["cinema-worker/**"],  // ← ADD
+  },
+  {
+    files: ["**/*.ts", "**/*.tsx", "**/*.js"],
     languageOptions: {
-      globals: globals.browser,
-      parserOptions: { ecmaFeatures: { jsx: true } },
+      parser: tsParser,
+    },
+    plugins: {
+      "@typescript-eslint": tsPlugin,
     },
   },
-])
+  {
+    files: ["**/handlers/proxy.js"],
+    languageOptions: {
+      globals: {
+        shExpMatch: "readonly",
+        FindProxyForURL: "readonly",
+        dnsDomainIs: "readonly",
+        dnsResolve: "readonly",
+        isInNet: "readonly",
+        myIpAddress: "readonly",
+      },
+    },
+    rules: {
+      "no-undef": "off",
+      "no-unused-vars": "off",
+    },
+  },
+];
