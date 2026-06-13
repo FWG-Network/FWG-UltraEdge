@@ -223,7 +223,7 @@ jobs:
         run: |
           OSV_VERSION="${{ env.OSV_SCANNER_VERSION }}"
           BASE_URL="https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}"
-          BINARY_FILE="osv-scanner_linux_amd64"
+          BINARY_FILE="osv-scanner_${OSV_VERSION}_linux_amd64"
 
           echo "📥 Downloading OSV Scanner V2 v${OSV_VERSION}..."
           wget -q "${BASE_URL}/${BINARY_FILE}"        -O /tmp/osv-scanner

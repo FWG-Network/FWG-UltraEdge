@@ -44,7 +44,7 @@ jobs:
         run: |
           OSV_VERSION="${{ env.OSV_SCANNER_VERSION }}"
           BASE_URL="https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}"
-          BINARY_FILE="osv-scanner_linux_amd64"
+          BINARY_FILE="osv-scanner_${OSV_VERSION}_linux_amd64"
           wget -q "${BASE_URL}/${BINARY_FILE}" -O /tmp/osv-scanner
           wget -q "${BASE_URL}/${BINARY_FILE}.sha256" -O /tmp/osv-scanner.sha256
           EXPECTED_HASH=$(awk '{print $1}' /tmp/osv-scanner.sha256)
