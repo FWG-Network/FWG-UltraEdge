@@ -97,14 +97,13 @@ export async function deleteR2Object(env: Env, key: string): Promise<Response> {
 export async function listR2Objects(req: Request, env: Env): Promise<Response> {
   try {
     const url = new URL(req.url);
-    const prefix = url.searchParams.get("prefix") ?? undefined;
+    const prefixParam = url.searchParams.get("prefix");
+    const cursorParam = url.searchParams.get("cursor");
     const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "100"), 1000);
-    const cursor = url.searchParams.get("cursor") ?? undefined;
-
     const result = await env.ULTRA_EDGE_VIDEOS.list({
-      prefix,
+      ...(prefixParam ? { prefix: prefixParam } : {}),
       limit,
-      cursor,
+      ...(cursorParam ? { cursor: cursorParam } : {}),
     });
 
     return Response.json({
