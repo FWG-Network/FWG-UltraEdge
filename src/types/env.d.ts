@@ -5,11 +5,11 @@
 export interface Env {
   // ── KV Namespace ──
   ULTRA_EDGE_KV: KVNamespace;
-  KV: KVNamespace;
+  
 
   // ── R2 Bucket ──
   ULTRA_EDGE_VIDEOS: R2Bucket;
-  R2: R2Bucket;
+
 
   // ── Durable Objects ──
   SMART_ROUTER: DurableObjectNamespace;
