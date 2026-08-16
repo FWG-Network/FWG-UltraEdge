@@ -33,8 +33,8 @@ APP_VERSION = "3.4.0"
 # ════════════════════════════════════════════════════════════
 [[kv_namespaces]]
 binding    = "ULTRA_EDGE_KV"
-id         = "REAL_PROD_KV_ID"
-preview_id = "REAL_PREVIEW_KV_ID"
+id         = "${KV_NAMESPACE_ID}"
+preview_id = "${KV_NAMESPACE_PREVIEW_ID}"
 
 # ════════════════════════════════════════════════════════════
 # R2 BUCKET
