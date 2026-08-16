@@ -140,5 +140,5 @@ dataset = "ultra_edge_traffic"
 
 [[env.production.d1_databases]]
 binding = "ULTRA_EDGE_DB"
-database_name = "PUT_D1_DB_NAME_HERE"
-database_id = "PUT_D1_DATABASE_ID_HERE"
+database_name = "ultra-edge-analytics-db"
+database_id = "cfeed72e-bfb1-45ea-b170-82e3ffac452a"
