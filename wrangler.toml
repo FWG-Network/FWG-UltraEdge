@@ -3,62 +3,38 @@
 # Advanced Observability | Global Optimization | SLSA Ready
 # Durable Objects | KV | R2 | Smart Placement
 # ============================================================
-# 🔐 SECURITY HARDENED — FWG White-Hat Audit v4.0
-# Fixes:
-#   [FIX-1] compatibility_date ចាស់ → 2026-05-23
-#   [FIX-2] Duplicate [env.production] block លុបចោល
-#   [FIX-3] Duplicate [env.staging] block លុបចោល
-#   [FIX-4] Root-level workers_dev = false
-#   [FIX-5] SENTRY_DSN → wrangler secret (កុំ hardcode)
-#   [FIX-6] CF_CLIENT_ID → wrangler secret
-#   [FIX-7] CF_CLIENT_SECRET → wrangler secret
-#   [FIX-8] workers_dev = true សម្រាប់ production
-#           ព្រោះប្រើ .workers.dev URL នៅក្នុង PAC file
-# ============================================================
-#
-# 🔐 SECRETS — Run commands ទាំងនេះនៅ Codespace មុន deploy:
-#
-#   wrangler secret put SENTRY_DSN --env production
-#   wrangler secret put SENTRY_DSN --env staging
-#   wrangler secret put CF_CLIENT_ID --env production
-#   wrangler secret put CF_CLIENT_ID --env staging
-#   wrangler secret put CF_CLIENT_SECRET --env production
-#   wrangler secret put CF_CLIENT_SECRET --env staging
-#
-# ============================================================
 
 name                = "ultraedge-prod"
 main                = "src/index.ts"
 compatibility_date  = "2026-05-23"
 compatibility_flags = ["nodejs_compat"]
-workers_dev         = false
+workers_dev         = false   # set true if PAC requires .workers.dev
 
-# ── Global Optimization ──────────────────────────────────────
+[cache]
+enabled = true
+
 [placement]
 mode = "smart"
 
-# ── Worker CPU/Memory limits ─────────────────────────────────
 [limits]
-# cpu_ms = 50
+cpu_ms = 50
 
-# ── Observability ────────────────────────────────────────────
 [observability]
 enabled            = true
 head_sampling_rate = 0.1
 
-# ── Vars ─────────────────────────────────────────────────────
 [vars]
 ENVIRONMENT = "production"
 APP_NAME    = "FWG-UltraEdge"
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.4.0"
 
 # ════════════════════════════════════════════════════════════
-# KV NAMESPACE
+# KV NAMESPACE — replace with actual IDs
 # ════════════════════════════════════════════════════════════
 [[kv_namespaces]]
 binding    = "ULTRA_EDGE_KV"
-id         = "${KV_NAMESPACE_ID}"
-preview_id = "${KV_NAMESPACE_PREVIEW_ID}"
+id         = "REAL_PROD_KV_ID"
+preview_id = "REAL_PREVIEW_KV_ID"
 
 # ════════════════════════════════════════════════════════════
 # R2 BUCKET
@@ -87,6 +63,9 @@ workers_dev         = true
 compatibility_date  = "2026-05-23"
 compatibility_flags = ["nodejs_compat"]
 
+[env.staging.cache]
+enabled = true
+
 [env.staging.placement]
 mode = "smart"
 
@@ -97,12 +76,12 @@ head_sampling_rate = 1.0
 [env.staging.vars]
 ENVIRONMENT = "staging"
 APP_NAME    = "FWG-UltraEdge"
-APP_VERSION = "3.0.0-stg"
+APP_VERSION = "3.4.0-stg"
 
 [[env.staging.kv_namespaces]]
 binding    = "ULTRA_EDGE_KV"
-id         = "677028db1517494cbe971e34f22429a6"
-preview_id = "677028db1517494cbe971e34f22429a6"
+id         = "REAL_STAGING_KV_ID"
+preview_id = "REAL_STAGING_PREVIEW_ID"
 
 [[env.staging.r2_buckets]]
 binding     = "ULTRA_EDGE_VIDEOS"
@@ -117,9 +96,12 @@ class_name = "SmartRouter"
 # ════════════════════════════════════════════════════════════
 [env.production]
 name                = "ultraedge-prod"
-workers_dev         = false  # ✅
+workers_dev         = false   # set true if PAC requires .workers.dev
 compatibility_date  = "2026-05-23"
 compatibility_flags = ["nodejs_compat"]
+
+[env.production.cache]
+enabled = true
 
 [env.production.placement]
 mode = "smart"
@@ -131,11 +113,11 @@ head_sampling_rate = 0.1
 [env.production.vars]
 ENVIRONMENT = "production"
 APP_NAME    = "FWG-UltraEdge"
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.4.0"
 
 [[env.production.kv_namespaces]]
 binding    = "ULTRA_EDGE_KV"
-id         = "${KV_NAMESPACE_PROD_ID}"
+id         = "REAL_PROD_KV_ID"
 
 [[env.production.r2_buckets]]
 binding     = "ULTRA_EDGE_VIDEOS"
