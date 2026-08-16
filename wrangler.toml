@@ -130,3 +130,15 @@ class_name = "SmartRouter"
 [[env.production.migrations]]
 tag                = "v1"
 new_sqlite_classes = ["SmartRouter"]
+
+[[env.production.ai]]
+binding = "ULTRA_EDGE_AI_TRAFFIC"
+
+[[env.production.analytics_engine_datasets]]
+binding = "ULTRA_EDGE_TRAFFIC_METRICS"
+dataset = "ultra_edge_traffic"
+
+[[env.production.d1_databases]]
+binding = "ULTRA_EDGE_DB"
+database_name = "PUT_D1_DB_NAME_HERE"
+database_id = "PUT_D1_DATABASE_ID_HERE"
