@@ -155,7 +155,7 @@ binding = "ULTRA_EDGE_MEDIA"
 
 [[env.production.r2_buckets]]
 binding = "ULTRA_EDGE_ASSETS"
-bucket_name = "PUT_R2_BUCKET_NAME_HERE"
+bucket_name = "ultra-edge-thumbnails"
 
 [[env.production.streams]]
 binding = "ULTRA_EDGE_STREAM"
