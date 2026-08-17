@@ -142,3 +142,7 @@ dataset = "ultra_edge_traffic"
 binding = "ULTRA_EDGE_DB"
 database_name = "ultra-edge-analytics-db"
 database_id = "cfeed72e-bfb1-45ea-b170-82e3ffac452a"
+
+#sentry
+compatibility_flags = ["nodejs_compat"]
+# compatibility_flags = ["nodejs_als"]
