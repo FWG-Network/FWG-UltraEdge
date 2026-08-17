@@ -117,7 +117,7 @@ APP_VERSION = "3.4.0"
 
 [[env.production.kv_namespaces]]
 binding    = "ULTRA_EDGE_KV"
-id         = "REAL_PROD_KV_ID"
+id         = "c81769ba55e7455795ab87878f71d67f"
 
 [[env.production.r2_buckets]]
 binding     = "ULTRA_EDGE_VIDEOS"
@@ -130,3 +130,15 @@ class_name = "SmartRouter"
 [[env.production.migrations]]
 tag                = "v1"
 new_sqlite_classes = ["SmartRouter"]
+
+[env.production.ai]
+binding = "ULTRA_EDGE_AI_TRAFFIC"
+
+[[env.production.analytics_engine_datasets]]
+binding = "ULTRA_EDGE_TRAFFIC_METRICS"
+dataset = "ultra_edge_traffic"
+
+[[env.production.d1_databases]]
+binding = "ULTRA_EDGE_DB"
+database_name = "ultra-edge-analytics-db"
+database_id = "cfeed72e-bfb1-45ea-b170-82e3ffac452a"
