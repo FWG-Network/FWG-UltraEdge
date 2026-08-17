@@ -30,7 +30,7 @@ APP_VERSION = "3.4.0"
 
 # ════════════════════════════════════════════════════════════
 # KV NAMESPACE — replace with actual IDs
-# ════════════════════════════════════════════════════════════
+# ═══��════════════════════════════════════════════════════════
 [[kv_namespaces]]
 binding    = "ULTRA_EDGE_KV"
 id         = "${KV_NAMESPACE_ID}"
@@ -137,6 +137,11 @@ binding = "ULTRA_EDGE_AI_TRAFFIC"
 [[env.production.analytics_engine_datasets]]
 binding = "ULTRA_EDGE_TRAFFIC_METRICS"
 dataset = "ultra_edge_traffic"
+
+# --- ADDED: Analytics Engine binding for telemetry datapoints
+[[env.production.analytics_engine_datasets]]
+binding = "ULTRAEDGETRAFFIC_METRICS"
+dataset = "ultraedgetraffic"
 
 [[env.production.d1_databases]]
 binding = "ULTRA_EDGE_DB"
