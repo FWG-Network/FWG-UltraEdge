@@ -142,20 +142,3 @@ dataset = "ultra_edge_traffic"
 binding = "ULTRA_EDGE_DB"
 database_name = "ultra-edge-analytics-db"
 database_id = "cfeed72e-bfb1-45ea-b170-82e3ffac452a"
-
-[[env.production.ai_search]]
-binding = "ULTRA_EDGE_AI_SEARCH"
-index_name = "viral-clips"
-
-[[env.production.images]]
-binding = "ULTRA_EDGE_IMAGES"
-
-[[env.production.media]]
-binding = "ULTRA_EDGE_MEDIA"
-
-[[env.production.r2_buckets]]
-binding = "ULTRA_EDGE_ASSETS"
-bucket_name = "ultra-edge-thumbnails"
-
-[[env.production.streams]]
-binding = "ULTRA_EDGE_STREAM"
