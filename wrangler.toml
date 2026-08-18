@@ -16,8 +16,6 @@ enabled = true
 [placement]
 mode = "smart"
 
-[limits]
-cpu_ms = 50
 
 [observability]
 enabled            = true

@@ -79,7 +79,7 @@ export async function captureError(
       cf_ray: req.headers.get("CF-Ray") ?? "unknown",
       cf_country: req.headers.get("CF-IPCountry") ?? "unknown",
     },
-    extra,
+    ...(extra !== undefined ? { extra } : {}),
     request: {
       url: req.url,
       method: req.method,

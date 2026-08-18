@@ -1,3 +1,4 @@
+
 // FWG-UltraEdge 🌍⚡ — src/middleware/edgeCache.ts
 import type { Env } from "../types/env";
 
@@ -53,7 +54,7 @@ export async function withEdgeCache(
   if (cfCached) return applyCacheHeaders(cfCached, ttl, immutable, tag, "HIT");
 
   const kvKey = `cache:${url.pathname}${url.search}`;
-  const kvRaw = await env.KV.get(kvKey, "arrayBuffer").catch(() => null);
+  const kvRaw = await env.ULTRA_EDGE_KV.get(kvKey, "arrayBuffer").catch(() => null);
   if (kvRaw) {
     const stale = applyCacheHeaders(
       new Response(kvRaw, { headers: { "Content-Type": "application/json" } }),
@@ -72,7 +73,7 @@ export async function withEdgeCache(
       cache.put(cacheKey, toCache.clone()),
       url.pathname.startsWith("/api/video") ? Promise.resolve()
         : origin.clone().arrayBuffer()
-            .then(buf => env.KV.put(kvKey, buf, { expirationTtl: ttl }))
+            .then(buf => env.ULTRA_EDGE_KV.put(kvKey, buf, { expirationTtl: ttl }))
             .catch(() => {}),
     ]));
     return toCache;

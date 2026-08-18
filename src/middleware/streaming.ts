@@ -1,4 +1,5 @@
-// FWG-UltraEdge 🌍⚡ — src/middleware/streaming.ts
+
+// FWG-UltraEdge 🛡️⚡ — src/middleware/streaming.ts
 // Direct R2 body — no TransformStream loop
 import type { Env } from "../types/env";
 
@@ -14,13 +15,46 @@ export function detectMimeType(filename: string): string {
   return MIME[ext] ?? "application/octet-stream";
 }
 
-export function parseRange(rangeHeader: string|null, totalSize: number): { start:number; end:number }|null {
-  if (!rangeHeader) return null;
-  const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
+export function parseRange(
+  rangeHeader: string | null,
+  totalSize: number
+): { start: number; end: number } | null {
+  if (!rangeHeader || totalSize <= 0) return null;
+
+  const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
   if (!match) return null;
-  const start = match[1] ? parseInt(match[1]) : totalSize - parseInt(match[2]);
-  const end   = match[2] ? parseInt(match[2]) : totalSize - 1;
-  if (isNaN(start)||isNaN(end)||start>end||end>=totalSize) return null;
+
+  const startRaw = match[1];
+  const endRaw = match[2];
+
+  if (!startRaw && !endRaw) return null;
+
+  let start: number;
+  let end: number;
+
+  if (startRaw) {
+    start = Number(startRaw);
+    end = endRaw ? Number(endRaw) : totalSize - 1;
+  } else {
+    const suffixLength = Number(endRaw);
+    if (!Number.isInteger(suffixLength) || suffixLength <= 0) {
+      return null;
+    }
+
+    start = Math.max(totalSize - suffixLength, 0);
+    end = totalSize - 1;
+  }
+
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    start > end ||
+    end >= totalSize
+  ) {
+    return null;
+  }
+
   return { start, end };
 }
 
@@ -29,12 +63,12 @@ export async function streamR2Video(req: Request, env: Env, filename: string): P
   const rangeHeader = req.headers.get("Range");
 
   if (rangeHeader) {
-    const head = await env.R2.head(filename);
+    const head = await env.ULTRA_EDGE_VIDEOS.head(filename);
     if (!head) return Response.json({ error: "Video not found" }, { status: 404 });
     const range = parseRange(rangeHeader, head.size);
     if (!range) return new Response("Range Not Satisfiable", { status: 416, headers: { "Content-Range": `bytes */${head.size}` } });
     const { start, end } = range;
-    const obj = await env.R2.get(filename, { range: { offset: start, length: end - start + 1 } });
+    const obj = await env.ULTRA_EDGE_VIDEOS.get(filename, { range: { offset: start, length: end - start + 1 } });
     if (!obj) return Response.json({ error: "Video not found" }, { status: 404 });
     return new Response(obj.body, {
       status: 206,
@@ -51,7 +85,7 @@ export async function streamR2Video(req: Request, env: Env, filename: string): P
     });
   }
 
-  const obj = await env.R2.get(filename);
+  const obj = await env.ULTRA_EDGE_VIDEOS.get(filename);
   if (!obj) return Response.json({ error: "Video not found" }, { status: 404 });
   return new Response(obj.body, {
     status: 200,
@@ -71,12 +105,12 @@ export async function streamR2Video(req: Request, env: Env, filename: string): P
 export async function proxyLiveStream(req: Request, originUrl: string): Promise<Response> {
   const upstream = await fetch(new Request(originUrl, {
     method: req.method,
-    headers: { "Accept": req.headers.get("Accept")??"*/*", "Range": req.headers.get("Range")??"", "User-Agent": "FWG-UltraEdge/3.0 🌍⚡", "Cache-Control": "no-cache" },
+    headers: { "Accept": req.headers.get("Accept")??"*/*", "Range": req.headers.get("Range")??"", "User-Agent": "FWG-UltraEdge/3.0 🛡️⚡", "Cache-Control": "no-cache" },
   }));
   const headers = new Headers(upstream.headers);
   headers.set("X-Accel-Buffering", "no");
   headers.set("Cache-Control", "no-cache, no-store");
   headers.set("Access-Control-Allow-Origin", "*");
-  headers.set("X-Powered-By", "FWG-UltraEdge 🌍⚡");
+  headers.set("X-Powered-By", "FWG-UltraEdge 🛡️⚡");
   return new Response(upstream.body, { status: upstream.status, headers });
 }

@@ -175,7 +175,11 @@ export async function kvListHandler(
 
     const cursor = url.searchParams.get("cursor") ?? undefined;
 
-    const result = await env.ULTRA_EDGE_KV.list({ prefix, limit, cursor });
+    const result = await env.ULTRA_EDGE_KV.list({
+      prefix,
+      limit,
+      ...(cursor ? { cursor } : {}),
+    });
 
     return Response.json({
       ok:            true,
