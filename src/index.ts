@@ -1,225 +1,272 @@
-// =========================================================
+=========================================================
 // FWG Live Stream Edge Worker — Zero-Lag 1080p+
 // Optimized for HLS / DASH live & VOD over Cloudflare
 // ===========================================================
 
 export interface Env {
- BACKEND_URL: string;
-  FWGAPISECRET: string;
-  ULTRA_EDGE_TRAFFIC_METRICS: AnalyticsEngineDataset;
+  BACKEND_URL: string;
+  FWG_API_SECRET: string;
+}
+
+// ─── TTL ─────────────────────────────────────────────────────
+const TTL_SEGMENT  = 31_536_000; // 1 year  — .ts / .m4s  (immutable)
+const TTL_KEY_FRAME = 600;       // 10 min  — .vtt / .key / subtitles
+const TTL_SHORT     = 5;         // 5 sec   — .m3u8 / .mpd (live playlist)
+
+// ─── Content classification ───────────────────────────────────
+
+type ContentKind = "manifest" | "segment" | "key" | "mp4" | "other";
+
+function classifyPath(pathname: string): ContentKind {
+  if (pathname.endsWith(".m3u8") || pathname.endsWith(".mpd"))  return "manifest";
+  if (pathname.endsWith(".ts")   || pathname.endsWith(".m4s"))  return "segment";
+  if (pathname.endsWith(".key")  || pathname.endsWith(".vtt"))  return "key";
+  if (pathname.endsWith(".mp4")  || pathname.endsWith(".webm")) return "mp4";
+  return "other";
+}
+
+// ─── Cache-Control per content kind ──────────────────────────
+
+function cacheControlHeader(kind: ContentKind): string {
+  switch (kind) {
+    case "manifest":
+      // Live playlists MUST be re-fetched every ~2s by the player
+      return "no-cache, no-store, must-revalidate";
+
+    case "segment":
+      // Segments are write-once / immutable — cache forever at edge & browser
+      return `public, max-age=${TTL_SEGMENT}, immutable`;
+
+    case "key":
+      // Encryption keys: cache briefly, don't expose too long
+      return `public, max-age=${TTL_KEY_FRAME}`;
+
+    case "mp4":
+      // Full MP4 direct play — allow range-based caching, no transform
+      return "public, max-age=3600, no-transform";
+
+    default:
+      return "public, max-age=60";
+  }
+}
+
+// ─── Cloudflare cf fetch options per content kind ────────────
+// This tells Cloudflare's own edge cache (different from Workers cache) what to do.
+
+function cfOptions(kind: ContentKind): RequestInitCfProperties {
+  switch (kind) {
+    case "segment":
+      return {
+        cacheEverything: true,
+        cacheTtl:        TTL_SEGMENT,
+        polish:          "off",   // never compress video binary
+        mirage:          false,
+        minify:          { javascript: false, css: false, html: false },
+      };
+
+    case "manifest":
+      return {
+        cacheEverything: true,
+        cacheTtl:        TTL_SHORT,   // Cloudflare edge caches for 5s only
+        polish:          "off",
+        mirage:          false,
+      };
+
+    case "mp4":
+      return {
+        cacheEverything: true,
+        cacheTtl:        3600,
+        polish:          "off",
+        mirage:          false,
+      };
+
+    default:
+      return {
+        cacheEverything: false,
+        polish:          "lossy",
+        mirage:          true,
+      };
+  }
+}
+
+// ─── Build streaming response headers ────────────────────────
+
+function buildResponseHeaders(
+  origin: Headers,
+  kind: ContentKind,
+  rid: string
+): Headers {
+  const h = new Headers(origin);
+
+  // CORS — required for HLS.js / video.js / Shaka player in browser
+  h.set("Access-Control-Allow-Origin",  "*");
+  h.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, X-Request-ID");
+
+  // Byte-range support — critical for video seeking and adaptive bitrate
+  h.set("Accept-Ranges", "bytes");
+
+  // Cache policy
+  h.set("Cache-Control", cacheControlHeader(kind));
+
+  // Live stream: disable Nginx-style proxy buffering on any upstream
+  if (kind === "manifest" || kind === "segment") {
+    h.set("X-Accel-Buffering", "no");
   }
 
-  // ─── TTL constants ──────────────────────────────────────────
-  const TTL_SEGMENT     = 31_536_000; // 1 year
-  const TTL_KEY_FRAME   = 600;        // 10 min
-  const TTL_MANIFEST    = 2;          // 2s for HLS/DASH
-  const SWR_MANIFEST    = 3;          // 3s stale-while-revalidate
-  const TTL_LL_MANIFEST = 1;          // 1s for LL-HLS
-  const SWR_LL_MANIFEST = 2;          // 2s stale-while-revalidate
+  // Security
+  h.set("X-Content-Type-Options", "nosniff");
+  h.set("X-Request-ID",           rid);
 
-  // ─── Content classification ─────────────────────────────────
-  type ContentKind = "manifest" | "ll-manifest" | "segment" | "key" | "mp4" | "other";
+  // Remove headers that can break streaming
+  h.delete("content-encoding"); // don't double-encode
+  h.delete("transfer-encoding"); // let Workers handle this
 
-  function classifyPath(pathname: string): ContentKind {
-   if (pathname.endsWith(".m3u8") || pathname.endsWith(".mpd")) {
-      // crude classifier: LL-HLS manifests often include "_ll" or "lowlatency"
-         if (pathname.includes("_ll") || pathname.includes("lowlatency")) return "ll-manifest";
-            return "manifest";
-             }
-              if (pathname.endsWith(".ts")   || pathname.endsWith(".m4s"))  return "segment";
-               if (pathname.endsWith(".key")  || pathname.endsWith(".vtt"))  return "key";
-                if (pathname.endsWith(".mp4")  || pathname.endsWith(".webm")) return "mp4";
-                 return "other";
-                 }
+  return h;
+}
 
-                 // ─── Cloudflare cache options ───────────────────────────────
-                 function cfOptions(kind: ContentKind): RequestInitCfProperties {
-                  switch (kind) {
-                     case "manifest":
-                          return { cacheEverything: true, cacheTtlByStatus: { "200": TTL_MANIFEST, "500-599": 0 } };
-                             case "ll-manifest":
-                                  return { cacheEverything: true, cacheTtlByStatus: { "200": TTL_LL_MANIFEST, "500-599": 0 } };
-                                     case "segment":
-                                          return { cacheEverything: true, cacheTtlByStatus: { "200": TTL_SEGMENT, "500-599": 0 } };
-                                             case "mp4":
-                                                  return { cacheEverything: true, cacheTtlByStatus: { "200": 3600, "500-599": 0 } };
-                                                     case "key":
-                                                          return { cacheEverything: true, cacheTtlByStatus: { "200": TTL_KEY_FRAME, "500-599": 0 } };
-                                                             default:
-                                                                  return { cacheEverything: false };
-                                                                   }
-                                                                   }
+// ─── Safe cache key (GET-only, no auth headers in key) ───────
 
-                                                                   // ─── Cache-Control per content kind ─────────────────────────
-                                                                   function cacheHeaders(kind: ContentKind): { browser: string; cdn: string } {
-                                                                    switch (kind) {
-                                                                       case "manifest":
-                                                                            return { browser: "no-store", cdn: `max-age=${TTL_MANIFEST}, stale-while-revalidate=${SWR_MANIFEST}, stale-if-error=30` };
-                                                                               case "ll-manifest":
-                                                                                    return { browser: "no-store", cdn: `max-age=${TTL_LL_MANIFEST}, stale-while-revalidate=${SWR_LL_MANIFEST}, stale-if-error=30` };
-                                                                                       case "segment":
-                                                                                            return { browser: `public, max-age=${TTL_SEGMENT}, immutable`, cdn: `max-age=${TTL_SEGMENT}, immutable` };
-                                                                                               case "key":
-                                                                                                    return { browser: `public, max-age=${TTL_KEY_FRAME}`, cdn: `max-age=${TTL_KEY_FRAME}` };
-                                                                                                       case "mp4":
-                                                                                                            return { browser: "no-store", cdn: "max-age=3600, stale-if-error=300" };
-                                                                                                               default:
-                                                                                                                    return { browser: "no-store", cdn: "no-store" };
-                                                                                                                     }
-                                                                                                                     }
+function safeCacheKey(request: Request): Request {
+  const u = new URL(request.url);
+  const normalised = new URL(u.pathname.toLowerCase() + u.search, u.origin);
+  return new Request(normalised.toString(), { method: "GET" });
+}
 
-                                                                                                                     // ─── Build streaming response headers ───────────────────────
-                                                                                                                     function buildResponseHeaders(origin: Headers, kind: ContentKind, rid: string): Headers {
-                                                                                                                      const h = new Headers(origin);
+// ─── Request ID ───────────────────────────────────────────────
 
-                                                                                                                       h.set("Access-Control-Allow-Origin", "*");
-                                                                                                                        h.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, X-Request-ID");
-                                                                                                                         h.set("Accept-Ranges", "bytes");
+const rid = (): string => crypto.randomUUID().slice(0, 8);
 
-                                                                                                                          const policy = cacheHeaders(kind);
-                                                                                                                           h.set("Cache-Control", policy.browser);
-                                                                                                                            h.set("Cloudflare-CDN-Cache-Control", policy.cdn);
+// ─── Main handler ─────────────────────────────────────────────
 
-                                                                                                                             h.set("X-Content-Type-Options", "nosniff");
-                                                                                                                              h.set("X-Request-ID", rid);
+export default {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<Response> {
 
-                                                                                                                               // ⚠️ Do not delete Content-Encoding — preserve integrity
-                                                                                                                                h.delete("transfer-encoding");
+    const id       = rid();
+    const url      = new URL(request.url);
+    const pathname = url.pathname.toLowerCase();
+    const kind     = classifyPath(pathname);
 
-                                                                                                                                 return h;
-                                                                                                                                 }
-
-                                                                                                                                 // ─── Request ID ─────────────────────────────────────────────
-                                                                                                                                 const rid = (): string => crypto.randomUUID().slice(0, 8);
-
-                                                                                                                                 // ─── Main handler ───────────────────────────────────────────
-                                                                                                                                 export default {
-                                                                                                                                  async fetch(request: Request, env: Env): Promise<Response> {
-                                                                                                                                     const id       = rid();
-                                                                                                                                        const url      = new URL(request.url);
-                                                                                                                                           const pathname = url.pathname.toLowerCase();
-                                                                                                                                              const kind     = classifyPath(pathname);
-
-                                                                                                                                                 // Health check
-                                                                                                                                                    if (pathname === "/health" || pathname === "/_fwg/health") {
-                                                                                                                                                         return Response.json(
-                                                                                                                                                                { status: "ok", rid: id, ts: Date.now(), version: "3.4.0" },
-                                                                                                                                                                       { headers: { "Cache-Control": "no-store", "X-Request-ID": id } }
-                                                                                                                                                                            );
-                                                                                                                                                                               }
-
-                                                                                                                                                                                  // CORS Preflight
-                                                                                                                                                                                     if (request.method === "OPTIONS") {
-                                                                                                                                                                                          return new Response(null, {
-                                                                                                                                                                                                 status: 204,
-                                                                                                                                                                                                        headers: {
-                                                                                                                                                                                                                 "Access-Control-Allow-Origin": "*",
-                                                                                                                                                                                                                          "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                                                                                                                                                                                                                                   "Access-Control-Allow-Headers": "Content-Type, Range, Authorization",
-                                                                                                                                                                                                                                            "Access-Control-Max-Age": "86400",
-                                                                                                                                                                                                                                                     "X-Request-ID": id,
-                                                                                                                                                                                                                                                            },
-                                                                                                                                                                                                                                                                 });
-                                                                                                                                                                                                                                                                    }
-
-                                                                                                                                                                                                                                                                       // Reject non-GET/HEAD
-                                                                                                                                                                                                                                                                          if (!["GET", "HEAD"].includes(request.method)) {
-                                                                                                                                                                                                                                                                               return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD, OPTIONS" } });
-                                                                                                                                                                                                                                                                                  }
-
-                                                                                                                                                                                                                                                                                     // Proxy request to backend — no Range/conditional headers
-                                                                                                                                                                                                                                                                                        const backendBase = env.BACKEND_URL || "https://fallback.fwg.internal";
-                                                                                                                                                                                                                                                                                           const targetUrl   = new URL(url.pathname + url.search, backendBase);
-
-                                                                                                                                                                                                                                                                                              const proxyHeaders = new Headers();
-                                                                                                                                                                                                                                                                                                 for (const key of ["accept", "user-agent"]) {
-                                                                                                                                                                                                                                                                                                      const val = request.headers.get(key);
-                                                                                                                                                                                                                                                                                                           if (val) proxyHeaders.set(key, val);
-                                                                                                                                                                                                                                                                                                              }
-                                                                                                                                                                                                                                                                                                                 proxyHeaders.set("X-Forwarded-Proto", "https");
-                                                                                                                                                                                                                                                                                                                    proxyHeaders.set("X-Request-ID", id);
-                                                                                                                                                                                                                                                                                                                       if (env.FWGAPISECRET) proxyHeaders.set("Authorization", `Bearer ${env.FWGAPISECRET}`);
-
-                                                                                                                                                                                                                                                                                                                          let originResponse: Response;
-                                                                                                                                                                                                                                                                                                                             try {
-                                                                                                                                                                                                                                                                                                                                  const telemetryStart = Date.now();
-
-    originResponse = await fetch(new Request(targetUrl.toString(), {
-                                                                                                                                                                                                                                                                                                                                         method: request.method,
-                                                                                                                                                                                                                                                                                                                                                headers: proxyHeaders,
-                                                                                                                                                                                                                                                                                                                                                       redirect: "follow",
-                                                                                                                                                                                                                                                                                                                                                            }), { cf: cfOptions(kind) });
-
-    // Production baseline telemetry ONLY.
-    try {
-      const ttfbMs = Date.now() - telemetryStart;
-      const cl = originResponse.headers.get("Content-Length");
-      const parsedLength = cl === null ? NaN : Number(cl);
-      const responseBytes = Number.isFinite(parsedLength) ? parsedLength : -1;
-
-      env.ULTRA_EDGE_TRAFFIC_METRICS.writeDataPoint({
-        blobs: [
-          kind,
-          String(originResponse.status),
-          "direct",
-          ((request as Request & {
-            cf?: { colo?: string };
-          }).cf?.colo ?? "UNKNOWN"),
-        ],
-        doubles: [
-          ttfbMs,
-          -1,
-          responseBytes,
-        ],
-        indexes: ["direct"],
-      });
-    
-    } catch (teleErr) {
-      console.error(`[${id}] telemetry write error`, teleErr);
+    // ── Health check ─────────────────────────────────────────
+    if (pathname === "/health" || pathname === "/_fwg/health") {
+      return Response.json(
+        { status: "ok", rid: id, ts: Date.now(), version: "2.0.0" },
+        { headers: { "Cache-Control": "no-store", "X-Request-ID": id } }
+      );
     }
-                                                                                                                                                                                                                                                                                                                                                               } catch (err) {
-                                                                                                                                                                                                                                                                                                                                                                    return Response.json(
-                                                                                                                                                                                                                                                                                                                                                                           { error: "FWG Edge: Backend offline", rid: id },
-                                                                                                                                                                                                                                                                                                                                                                                  { status: 504, headers: { "Retry-After": "5", "X-Request-ID": id } }
-                                                                                                                                                                                                                                                                                                                                                                                       );
-                                                                                                                                                                                                                                                                                                                                                                                          }
 
-                                                                                                                                                                                                                                                                                                                                                                                             // Defensive handling for unexpected 206
-                                                                                                                                                                                                                                                                                                                                                                                                if (originResponse.status === 206) {
-                                                                                                                                                                                                                                                                                                                                                                                                     console.error(`[${id}] Unexpected upstream 206`);
-                                                                                                                                                                                                                                                                                                                                                                                                          return new Response("Unexpected partial response from origin", {
-                                                                                                                                                                                                                                                                                                                                                                                                                 status: 502,
-                                                                                                                                                                                                                                                                                                                                                                                                                        headers: {
-                                                                                                                                                                                                                                                                                                                                                                                                                                 "Content-Type": "text/plain",
-                                                                                                                                                                                                                                                                                                                                                                                                                                          "X-Request-ID": id,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                   "Cache-Control": "no-store",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                            "Cloudflare-CDN-Cache-Control": "no-store",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                   },
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                        });
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                           }
+    // ── CORS Preflight ───────────────────────────────────────
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin":  "*",
+          "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Range, Authorization",
+          "Access-Control-Max-Age":       "86400",
+          "X-Request-ID":                 id,
+        },
+      });
+    }
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                              // Error response path — do not cache
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 if (originResponse.status >= 500) {
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      return new Response(originResponse.body, {
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             status: originResponse.status,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    statusText: originResponse.statusText,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           headers: new Headers({
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    "Content-Type": originResponse.headers.get("Content-Type") ?? "text/plain",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             "Cache-Control": "no-store",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      "Cloudflare-CDN-Cache-Control": "no-store",
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               "X-Request-ID": id,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      }),
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           });
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              }
+    // ── Reject non-GET/HEAD ──────────────────────────────────
+    if (!["GET", "HEAD"].includes(request.method)) {
+      return new Response("Method Not Allowed", {
+        status: 405,
+        headers: { Allow: "GET, HEAD, OPTIONS" },
+      });
+    }
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 // Build final response
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    const responseHeaders = buildResponseHeaders(originResponse.headers, kind, id);
+    // ── Worker Cache — serve segments instantly from edge ────
+    // Workers Cache API is per-datacenter: viewer in Singapore hits
+    // Singapore PoP, not your origin.  This is the main lag killer.
+    const cache    = caches.default;
+    const cacheKey = safeCacheKey(request);
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       return new Response(originResponse.body, {
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            status: originResponse.status,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 statusText: originResponse.statusText,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      headers: responseHeaders,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         });
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          },
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          };
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          export { SmartRouter } from "./durable/SmartRouter";
+    if (kind === "segment") {
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        const h = new Headers(cached.headers);
+        h.set("X-Cache",      "HIT");
+        h.set("X-Request-ID", id);
+        return new Response(cached.body, { status: cached.status, headers: h });
+      }
+    }
+
+    // ── Build proxy request ──────────────────────────────────
+    const backendBase = env.BACKEND_URL || "https://fallback.fwg.internal";
+    const targetUrl   = new URL(url.pathname + url.search, backendBase);
+
+    const proxyHeaders = new Headers();
+
+    // Pass through ONLY safe, relevant headers — not cookies, not host
+    for (const key of ["range", "if-range", "if-none-match", "if-modified-since", "accept", "accept-encoding", "user-agent"]) {
+      const val = request.headers.get(key);
+      if (val) proxyHeaders.set(key, val);
+    }
+
+    proxyHeaders.set("X-Forwarded-Proto", "https");
+    proxyHeaders.set("X-Request-ID",      id);
+
+    if (env.FWG_API_SECRET) {
+      proxyHeaders.set("Authorization", `Bearer ${env.FWG_API_SECRET}`);
+    }
+
+    const proxyRequest = new Request(targetUrl.toString(), {
+      method:  request.method,
+      headers: proxyHeaders,
+      redirect: "follow",
+    });
+
+    // ── Fetch from backend ───────────────────────────────────
+    let originResponse: Response;
+
+    try {
+      originResponse = await fetch(proxyRequest, { cf: cfOptions(kind) });
+    } catch (err) {
+      console.error(`[${id}] Backend unreachable: ${(err as Error).message}`);
+      return Response.json(
+        { error: "FWG Edge: Backend offline or too slow", rid: id },
+        {
+          status:  504,
+          headers: { "Retry-After": "5", "X-Request-ID": id },
+        }
+      );
+    }
+
+    // ── Non-2xx passthrough (don't cache errors) ─────────────
+    if (!originResponse.ok && originResponse.status !== 206) {
+      return new Response(originResponse.body, {
+        status:     originResponse.status,
+        statusText: originResponse.statusText,
+        headers:    new Headers({
+          "Content-Type": originResponse.headers.get("Content-Type") ?? "text/plain",
+          "X-Request-ID": id,
+          "X-Cache":      "BYPASS",
+        }),
+      });
+    }
+
+    // ── Build final streaming response ───────────────────────
+    const responseHeaders = buildResponseHeaders(originResponse.headers, kind, id);
+    responseHeaders.set("X-Cache", "MISS");
+
+    const finalResponse = new Response(originResponse.body, {
+      status:     originResponse.status,  // preserves 206 Partial Content for Range
+      statusText: originResponse.statusText,
+      headers:    responseHeaders,
+    });
+
+    // ── Store segment in Workers Cache (background) ──────────
+    // ctx.waitUntil: doesn't block the stream — response flows immediately,
+    // cache write happens in parallel so next viewer gets HIT.
+    if (kind === "segment" && originResponse.ok) {
+      ctx.waitUntil(cache.put(cacheKey, finalResponse.clone()));
+    }
+
+    return finalResponse;
+  },
+};
