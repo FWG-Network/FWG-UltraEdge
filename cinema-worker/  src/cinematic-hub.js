@@ -5,7 +5,7 @@ import * as Sentry    from "@sentry/cloudflare";    // [GAP-1]
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKER #6 — UNIVERSAL VIDEO HUB v2.1.0
 // FWG-UltraEdge Standard — Synced with index.ts v3.3.0
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 //
    Gaps closed vs v2.0.0 (synced with index.ts architecture):
    [GAP-1]  Sentry error tracking via withSentry() + captureException
