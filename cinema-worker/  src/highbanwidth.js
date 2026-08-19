@@ -2,7 +2,7 @@ function FindProxyForURL(url, host) {
 
     // =========================
     // ⚡ FAST DNS CACHE
-    // =========================
+    // ====================
     var ip = dnsResolve(host);
 
     // =========================
