@@ -93,9 +93,9 @@ class_name = "SmartRouter"
 # PRODUCTION ENVIRONMENT
 # ════════════════════════════════════════════════════════════
 [env.production]
-name                = "ultraedge-prod"
-workers_dev         = true   # set true if PAC requires .workers.dev
-compatibility_date  = "2026-05-23"
+name = "ultraedge-prod"
+workers_dev = true
+compatibility_date = "2026-05-23"
 compatibility_flags = ["nodejs_compat"]
 
 [env.production.cache]
