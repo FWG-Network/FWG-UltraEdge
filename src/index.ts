@@ -1,7 +1,7 @@
 // =========================================================
 // FWG Live Stream Edge Worker — Zero-Lag 1080p+
 // Optimized for HLS / DASH live & VOD over Cloudflare
-// ===========================================================
+// ========================================================
 
 export interface Env {
   BACKEND_URL: string;
