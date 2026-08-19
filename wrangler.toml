@@ -110,8 +110,9 @@ head_sampling_rate = 0.1
 
 [env.production.vars]
 ENVIRONMENT = "production"
-APP_NAME    = "FWG-UltraEdge"
+APP_NAME = "FWG-UltraEdge"
 APP_VERSION = "3.4.0"
+BACKEND_URL = "https://httpbingo.org"
 
 [[env.production.kv_namespaces]]
 binding    = "ULTRA_EDGE_KV"
