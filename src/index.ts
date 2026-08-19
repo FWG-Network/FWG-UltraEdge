@@ -1,6 +1,3 @@
-
-// FWG Live Stream Edge Worker — Zero-Lag 1080p+
-// Optimized for HLS / DASH live & VOD over Cloudflare
 export interface Env {
   BACKEND_URL: string;
   FWG_API_SECRET: string;
@@ -259,8 +256,7 @@ export default {
     });
 
     // ── Store segment in Workers Cache (background) ──────────
-    // ctx.waitUntil: doesn't block the stream — response flows immediately,
-    // cache write happens in parallel so next viewer gets HIT.
+    
     if (kind === "segment" && originResponse.ok) {
       ctx.waitUntil(cache.put(cacheKey, finalResponse.clone()));
     }
