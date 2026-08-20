@@ -8,7 +8,7 @@
     "noEmit": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "types": ["@cloudflare/workers-types"],
+    "types": ["./worker-configuration.d.ts"],
 
     // 🔐 Security & Type Safety — FWG Audit v4.0
     "noUncheckedIndexedAccess":    true,
