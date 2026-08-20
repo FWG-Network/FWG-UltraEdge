@@ -1,4 +1,4 @@
-/// <reference types="@cloudflare/workers-types" />
+/// <referenc types="@cloudflare/workers-types" />
 
 const VERSION = "1.0.0";
 
