@@ -168,7 +168,7 @@ export default {
          kind,
          String(originResponse.status),
          "direct",
-         request.cf?.colo ?? "UNKNOWN",
+         String(request.cf?.colo ?? "UNKNOWN"),
        ],
        doubles: [
          ttfbMs,
