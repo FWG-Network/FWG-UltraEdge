@@ -1,6 +1,5 @@
 // FWG-UltraEdge 🌍⚡ — Environment Types
 // Version: 3.0.0 | Cloudflare Workers Runtime
-/// <reference types="@cloudflare/workers-types" />
 
 export interface Env {
   // ── KV Namespace ──
