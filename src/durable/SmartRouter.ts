@@ -1,6 +1,7 @@
 // FWG-UltraEdge 🌍⚡ — SmartRouter Durable Object
 // Version: 3.0.0 | Cloudflare Durable Objects
 
+import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../types/env";
 
 interface RouteRecord {
@@ -11,23 +12,22 @@ interface RouteRecord {
   errors: number;
 }
 
-export class SmartRouter {
-  private state: DurableObjectState;
-  private env: Env;
-  private routes: Map<string, RouteRecord> = new Map();
+export class SmartRouter extends DurableObject<Env> {
+    private state: DurableObjectState;
+      private routes: Map<string, RouteRecord> = new Map();
 
-  constructor(state: DurableObjectState, env: Env) {
-    this.state = state;
-    this.env = env;
-    this.state.blockConcurrencyWhile(async () => {
-      const stored = await this.state.storage.get<RouteRecord[]>("routes");
-      if (stored) {
-        this.routes = new Map(stored.map((r) => [r.path, r]));
-      }
-    });
-  }
+        constructor(state: DurableObjectState, env: Env) {
+            super(state, env);
+                this.state = state;
 
-  async fetch(req: Request): Promise<Response> {
+                    this.state.blockConcurrencyWhile(async () => {
+                          const stored = await this.state.storage.get<RouteRecord[]>("routes");
+                                if (stored) {
+                                        this.routes = new Map(stored.map((r) => [r.path, r]));
+                                              }
+                                                  });
+                                                    }
+  override async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
 
     switch (url.pathname) {
