@@ -1,4 +1,4 @@
-// =========================================================
+========================================================
 // FWG Live Stream Edge Worker — Zero-Lag 1080p+
 // Optimized for HLS / DASH live & VOD over Cloudflare
 // ===========================================================
@@ -6,6 +6,7 @@
 export interface Env {
  BACKEND_URL: string;
  FWGAPISECRET: string;
+ ULTRAEDGETRAFFIC_METRICS: AnalyticsEngineDataset;
 }
 
 // ─── TTL constants ──────────────────────────────────────────
@@ -140,6 +141,7 @@ export default {
    if (env.FWGAPISECRET) proxyHeaders.set("Authorization", `Bearer ${env.FWGAPISECRET}`);
 
    let originResponse: Response;
+   const telemetryStart = Date.now();
    try {
      originResponse = await fetch(new Request(targetUrl.toString(), {
        method: request.method,
@@ -151,6 +153,32 @@ export default {
        { error: "FWG Edge: Backend offline", rid: id },
        { status: 504, headers: { "Retry-After": "5", "X-Request-ID": id } }
      );
+   }
+
+   // Telemetry: production-only ingestion per contract
+   try {
+     const ttfbMs = Date.now() - telemetryStart;
+     const cl = originResponse.headers.get("Content-Length");
+     const parsedLength = cl === null ? NaN : Number(cl);
+     const responseBytes = Number.isFinite(parsedLength) ? parsedLength : -1;
+
+     // Fire-and-forget per contract — do not await
+     env.ULTRAEDGETRAFFIC_METRICS.writeDataPoint({
+       blobs: [
+         kind,
+         String(originResponse.status),
+         "direct",
+         request.cf?.colo ?? "UNKNOWN",
+       ],
+       doubles: [
+         ttfbMs,
+         -1,
+         responseBytes,
+       ],
+       indexes: ["direct"],
+     });
+   } catch (teleErr) {
+     console.error(`[${id}] telemetry write error`, teleErr);
    }
 
    // Defensive handling for unexpected 206
