@@ -1,6 +1,5 @@
 // FWG-UltraEdge 🌍⚡ — SmartRouter Durable Object
 // Version: 3.0.0 | Cloudflare Durable Objects
-/// <reference types="@cloudflare/workers-types" />
 
 import type { Env } from "../types/env";
 
