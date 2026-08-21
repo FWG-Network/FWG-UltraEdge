@@ -134,8 +134,8 @@ new_sqlite_classes = ["SmartRouter"]
 binding = "ULTRA_EDGE_AI_TRAFFIC"
 
 [[env.production.analytics_engine_datasets]]
-binding = "ULTRA_EDGE_TRAFFIC_METRICS"
-dataset = "ultra_edge_traffic"
+binding = "ULTRAEDGETRAFFIC_METRICS"
+dataset = "ultraedgetraffic"
 
 [[env.production.d1_databases]]
 binding = "ULTRA_EDGE_DB"
