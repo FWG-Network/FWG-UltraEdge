@@ -5,8 +5,6 @@
 //   [FIX-1] Timing attack → safeCompare
 //   [FIX-2] Info leakage → minimal response
 
-/// <reference types="@cloudflare/workers-types" />
-
 import type { Env } from "../types/env";
 
 // ── Constant-time compare (prevent timing attacks) ──
